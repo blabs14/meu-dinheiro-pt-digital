@@ -14,7 +14,181 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      categories: {
+        Row: {
+          cor: string | null
+          created_at: string | null
+          id: string
+          nome: string
+          tipo: string
+        }
+        Insert: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome: string
+          tipo: string
+        }
+        Update: {
+          cor?: string | null
+          created_at?: string | null
+          id?: string
+          nome?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
+      fixed_expenses: {
+        Row: {
+          ativa: boolean | null
+          categoria_id: string | null
+          created_at: string | null
+          dia_vencimento: number
+          id: string
+          nome: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          ativa?: boolean | null
+          categoria_id?: string | null
+          created_at?: string | null
+          dia_vencimento: number
+          id?: string
+          nome: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          ativa?: boolean | null
+          categoria_id?: string | null
+          created_at?: string | null
+          dia_vencimento?: number
+          id?: string
+          nome?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fixed_expenses_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      goals: {
+        Row: {
+          created_at: string | null
+          id: string
+          nome: string
+          prazo: string | null
+          updated_at: string | null
+          user_id: string
+          valor_atual: number | null
+          valor_meta: number
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          nome: string
+          prazo?: string | null
+          updated_at?: string | null
+          user_id: string
+          valor_atual?: number | null
+          valor_meta: number
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          nome?: string
+          prazo?: string | null
+          updated_at?: string | null
+          user_id?: string
+          valor_atual?: number | null
+          valor_meta?: number
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string | null
+          foto_url: string | null
+          id: string
+          nome: string
+          percentual_divisao: number | null
+          poupanca_mensal: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          foto_url?: string | null
+          id?: string
+          nome: string
+          percentual_divisao?: number | null
+          poupanca_mensal?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          foto_url?: string | null
+          id?: string
+          nome?: string
+          percentual_divisao?: number | null
+          poupanca_mensal?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          categoria_id: string | null
+          created_at: string | null
+          data: string
+          descricao: string | null
+          id: string
+          modo: string
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Insert: {
+          categoria_id?: string | null
+          created_at?: string | null
+          data: string
+          descricao?: string | null
+          id?: string
+          modo: string
+          tipo: string
+          user_id: string
+          valor: number
+        }
+        Update: {
+          categoria_id?: string | null
+          created_at?: string | null
+          data?: string
+          descricao?: string | null
+          id?: string
+          modo?: string
+          tipo?: string
+          user_id?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_categoria_id_fkey"
+            columns: ["categoria_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
