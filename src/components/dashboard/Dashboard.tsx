@@ -15,6 +15,14 @@ import {
   CreditCard
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { RecentTransactions } from '@/components/transactions/RecentTransactions';
+import { ExpensesPieChart, MonthlyTrendChart, SavingsProgressChart } from '@/components/charts';
+import { GoalsManager } from '@/components/goals';
+import { WelcomeTutorial } from '@/components/onboarding';
+import { SettingsManager } from '@/components/settings';
+import { NotificationSystem } from '@/components/notifications/NotificationSystem';
+import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
 
 interface DashboardStats {
   totalIncome: number;
@@ -33,10 +41,24 @@ export const Dashboard = () => {
     upcomingBills: []
   });
   const [loading, setLoading] = useState(true);
+  const [transactionFormOpen, setTransactionFormOpen] = useState(false);
+  const [transactionType, setTransactionType] = useState<'receita' | 'despesa'>('despesa');
+  const [refreshTransactions, setRefreshTransactions] = useState(0);
+  const [currentView, setCurrentView] = useState<'dashboard' | 'goals' | 'settings'>('dashboard');
+  const [showTutorial, setShowTutorial] = useState(false);
 
   useEffect(() => {
     if (user) {
       loadDashboardData();
+      
+      // Verificar se é a primeira vez no dashboard
+      const hasSeenTutorial = localStorage.getItem(`tutorial_seen_${user.id}`);
+      if (!hasSeenTutorial) {
+        // Mostrar tutorial após um pequeno delay
+        setTimeout(() => {
+          setShowTutorial(true);
+        }, 1000);
+      }
     }
   }, [user]);
 
@@ -94,6 +116,18 @@ export const Dashboard = () => {
     }
   };
 
+  const handleTransactionSuccess = () => {
+    loadDashboardData();
+    setRefreshTransactions(prev => prev + 1);
+  };
+
+  const handleTutorialClose = () => {
+    setShowTutorial(false);
+    if (user) {
+      localStorage.setItem(`tutorial_seen_${user.id}`, 'true');
+    }
+  };
+
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {
       style: 'currency',
@@ -123,23 +157,63 @@ export const Dashboard = () => {
       {/* Header */}
       <header className="bg-card border-b px-4 py-4">
         <div className="flex items-center justify-between max-w-6xl mx-auto">
-          <div className="flex items-center space-x-3">
-            <div className="bg-primary rounded-full p-2">
-              <Euro className="h-6 w-6 text-primary-foreground" />
+          <div className="flex items-center space-x-6">
+            <div className="flex items-center space-x-3">
+              <div className="bg-primary rounded-full p-2">
+                <Euro className="h-6 w-6 text-primary-foreground" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold">Meu Dinheiro</h1>
+                <p className="text-sm text-muted-foreground">Olá, {user?.user_metadata?.nome || user?.email}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold">Meu Dinheiro</h1>
-              <p className="text-sm text-muted-foreground">Olá, {user?.user_metadata?.nome || user?.email}</p>
-            </div>
+            
+            {/* Navigation */}
+            <nav className="flex items-center space-x-1">
+              <Button
+                variant={currentView === 'dashboard' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentView('dashboard')}
+              >
+                Dashboard
+              </Button>
+              <Button
+                variant={currentView === 'goals' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentView('goals')}
+              >
+                Metas
+              </Button>
+              <Button
+                variant={currentView === 'settings' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setCurrentView('settings')}
+              >
+                Configurações
+              </Button>
+            </nav>
           </div>
-          <Button variant="outline" onClick={signOut}>
-            Sair
-          </Button>
+          <div className="flex items-center space-x-2">
+            <PWAInstallButton />
+            <NotificationSystem refreshTrigger={refreshTransactions} />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowTutorial(true)}
+              className="text-sm"
+            >
+              Tutorial
+            </Button>
+            <Button variant="outline" onClick={signOut}>
+              Sair
+            </Button>
+          </div>
         </div>
       </header>
 
-      {/* Dashboard Content */}
-      <main className="max-w-6xl mx-auto p-4 space-y-6">
+      {/* Main Content */}
+      {currentView === 'dashboard' ? (
+        <main className="max-w-6xl mx-auto p-4 space-y-6">
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card>
@@ -225,24 +299,73 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Charts Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <ExpensesPieChart refreshTrigger={refreshTransactions} />
+          <SavingsProgressChart refreshTrigger={refreshTransactions} />
+        </div>
+
+        {/* Monthly Trend Chart */}
+        <MonthlyTrendChart refreshTrigger={refreshTransactions} />
+
+        {/* Recent Transactions */}
+        <RecentTransactions refreshTrigger={refreshTransactions} />
+
         {/* Quick Actions */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Button className="h-24 flex flex-col gap-2" variant="outline">
+          <Button 
+            className="h-24 flex flex-col gap-2" 
+            variant="outline"
+            onClick={() => {
+              setTransactionType('despesa');
+              setTransactionFormOpen(true);
+            }}
+          >
             <Plus className="h-6 w-6" />
             <span>Nova Despesa</span>
           </Button>
           
-          <Button className="h-24 flex flex-col gap-2" variant="outline">
+          <Button 
+            className="h-24 flex flex-col gap-2" 
+            variant="outline"
+            onClick={() => {
+              setTransactionType('receita');
+              setTransactionFormOpen(true);
+            }}
+          >
             <TrendingUp className="h-6 w-6" />
             <span>Nova Receita</span>
           </Button>
           
-          <Button className="h-24 flex flex-col gap-2" variant="outline">
+          <Button 
+            className="h-24 flex flex-col gap-2" 
+            variant="outline"
+            onClick={() => setCurrentView('goals')}
+          >
             <Target className="h-6 w-6" />
             <span>Metas</span>
           </Button>
         </div>
       </main>
+      ) : currentView === 'goals' ? (
+        <GoalsManager refreshTrigger={refreshTransactions} />
+      ) : (
+        <SettingsManager />
+      )}
+
+      {/* Transaction Form Modal */}
+      <TransactionForm
+        open={transactionFormOpen}
+        onOpenChange={setTransactionFormOpen}
+        defaultType={transactionType}
+        onSuccess={handleTransactionSuccess}
+      />
+
+      {/* Tutorial de Boas-vindas */}
+      <WelcomeTutorial
+        open={showTutorial}
+        onOpenChange={handleTutorialClose}
+      />
     </div>
   );
 };

@@ -1,9 +1,14 @@
 import { useAuth } from '@/hooks/useAuth';
+import { useOnboarding } from '@/hooks/useOnboarding';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { Dashboard } from '@/components/dashboard/Dashboard';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 
 const Index = () => {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { needsOnboarding, loading: onboardingLoading, completeOnboarding } = useOnboarding();
+
+  const loading = authLoading || onboardingLoading;
 
   if (loading) {
     return (
@@ -16,7 +21,18 @@ const Index = () => {
     );
   }
 
-  return user ? <Dashboard /> : <AuthForm />;
+  // Não autenticado - mostrar formulário de login
+  if (!user) {
+    return <AuthForm />;
+  }
+
+  // Autenticado mas precisa de onboarding
+  if (needsOnboarding) {
+    return <OnboardingWizard onComplete={completeOnboarding} />;
+  }
+
+  // Autenticado e onboarding completo - mostrar dashboard
+  return <Dashboard />;
 };
 
 export default Index;
