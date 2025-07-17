@@ -7,8 +7,8 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, nome: string) => Promise<{ error: any }>;
-  signIn: (email: string, password: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, nome: string) => Promise<{ error: string | null }>;
+  signIn: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -61,7 +61,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: error.message,
           variant: "destructive"
         });
-        return { error };
+        return { error: error.message };
       }
 
       toast({
@@ -70,13 +70,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       return { error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: "Erro no registo",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
-      return { error };
+      return { error: errorMessage };
     }
   };
 
@@ -93,17 +94,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           description: error.message,
           variant: "destructive"
         });
-        return { error };
+        return { error: error.message };
       }
 
       return { error: null };
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: "Erro no login",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
-      return { error };
+      return { error: errorMessage };
     }
   };
 
@@ -114,10 +116,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         title: "Sessão terminada",
         description: "Sessão terminada com sucesso."
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
       toast({
         title: "Erro",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive"
       });
     }

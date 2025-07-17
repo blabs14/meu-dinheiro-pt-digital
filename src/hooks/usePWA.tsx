@@ -34,7 +34,7 @@ export const usePWA = () => {
         try {
           const registration = await navigator.serviceWorker.register('/sw.js');
           setSwRegistration(registration);
-          console.log('Service Worker registered successfully');
+          // Service Worker registered successfully
 
           // Verificar atualizações
           registration.addEventListener('updatefound', () => {
@@ -43,7 +43,7 @@ export const usePWA = () => {
               newWorker.addEventListener('statechange', () => {
                 if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
                   // Nova versão disponível
-                  console.log('Nova versão da app disponível');
+                  // Nova versão da app disponível
                 }
               });
             }
@@ -69,7 +69,7 @@ export const usePWA = () => {
       setIsInstalled(true);
       setIsInstallable(false);
       setInstallPrompt(null);
-      console.log('App foi instalada com sucesso');
+              // App foi instalada com sucesso
     };
 
     // Listeners para estado online/offline
