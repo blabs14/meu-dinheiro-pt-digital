@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -66,15 +66,7 @@ export type Database = {
           settings?: Json | null
           updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "families_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       family_invites: {
         Row: {
@@ -118,13 +110,6 @@ export type Database = {
             referencedRelation: "families"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "family_invites_invited_by_fkey"
-            columns: ["invited_by"]
-            isOneToOne: false
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
         ]
       }
       family_members: {
@@ -158,13 +143,6 @@ export type Database = {
             columns: ["family_id"]
             isOneToOne: false
             referencedRelation: "families"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "family_members_user_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -329,36 +307,6 @@ export type Database = {
         Args: { invite_token: string }
         Returns: Json
       }
-      accept_family_invite_by_email: {
-        Args: { 
-          p_email: string
-          p_user_id: string 
-        }
-        Returns: Json
-      }
-      create_family_with_member: {
-        Args: { 
-          p_family_name: string
-          p_user_id: string 
-          p_description?: string 
-        }
-        Returns: Json
-      }
-      create_family_direct: {
-        Args: { 
-          p_family_name: string
-          p_user_id: string 
-        }
-        Returns: string
-      }
-      get_user_family_data: {
-        Args: { p_user_id: string }
-        Returns: Json
-      }
-      get_family_members_with_profiles: {
-        Args: { p_family_id: string }
-        Returns: Json
-      }
     }
     Enums: {
       [_ in never]: never
@@ -490,4 +438,4 @@ export const Constants = {
   public: {
     Enums: {},
   },
-} as const
+} as const 
