@@ -55,6 +55,8 @@ export const SimpleFamilyManager = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('member');
   const [inviteLoading, setInviteLoading] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
 
   useEffect(() => {
     if (user && !authLoading) {
@@ -65,6 +67,12 @@ export const SimpleFamilyManager = () => {
       setLoading(false);
     }
   }, [user, authLoading]);
+
+  useEffect(() => {
+    if (currentFamily) {
+      loadPendingInvites(currentFamily.id);
+    }
+  }, [currentFamily]);
 
   const loadFamily = async () => {
     if (!user) return;
@@ -157,6 +165,105 @@ export const SimpleFamilyManager = () => {
       console.error('❌ Erro ao carregar membros:', error);
     } finally {
       setMembersLoading(false);
+    }
+  };
+
+  const loadPendingInvites = async (familyId: string) => {
+    try {
+      setInvitesLoading(true);
+      const { data, error } = await (supabase as any)
+        .rpc('get_family_pending_invites', { p_family_id: familyId });
+
+      if (error) {
+        console.error('❌ Erro ao carregar convites:', error);
+        return;
+      }
+
+      if (data && (data as any).success && (data as any).invites) {
+        setPendingInvites((data as any).invites);
+      } else {
+        setPendingInvites([]);
+      }
+    } catch (error: any) {
+      console.error('❌ Erro ao carregar convites:', error);
+    } finally {
+      setInvitesLoading(false);
+    }
+  };
+
+  const inviteMember = async () => {
+    if (!currentFamily || !inviteEmail.trim()) return;
+
+    try {
+      setInviteLoading(true);
+      
+      const { data, error } = await (supabase as any)
+        .rpc('invite_family_member_by_email', {
+          p_family_id: currentFamily.id,
+          p_email: inviteEmail.trim(),
+          p_role: inviteRole
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && (data as any).success) {
+        toast({
+          title: "Convite enviado! ✅",
+          description: `Convite enviado para ${inviteEmail}`,
+        });
+        
+        setInviteEmail('');
+        setInviteRole('member');
+        await loadPendingInvites(currentFamily.id);
+      } else {
+        throw new Error((data as any)?.message || 'Erro desconhecido');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Erro ao enviar convite:', error);
+      toast({
+        title: "Erro ao enviar convite",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  const cancelInvite = async (inviteId: string, email: string) => {
+    try {
+      const { data, error } = await (supabase as any)
+        .rpc('cancel_family_invite', {
+          p_invite_id: inviteId
+        });
+
+      if (error) {
+        throw error;
+      }
+
+      if (data && (data as any).success) {
+        toast({
+          title: "Convite cancelado ✅",
+          description: `Convite para ${email} foi cancelado`,
+        });
+        
+        if (currentFamily) {
+          await loadPendingInvites(currentFamily.id);
+        }
+      } else {
+        throw new Error((data as any)?.message || 'Erro desconhecido');
+      }
+
+    } catch (error: any) {
+      console.error('❌ Erro ao cancelar convite:', error);
+      toast({
+        title: "Erro ao cancelar convite",
+        description: error.message,
+        variant: "destructive"
+      });
     }
   };
 
@@ -389,38 +496,15 @@ export const SimpleFamilyManager = () => {
           {/* Configurações da Família */}
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <Settings className="h-5 w-5" />
-                    Configurações da Família
-                  </CardTitle>
-                  <CardDescription>
-                    Edite as configurações básicas da família
-                  </CardDescription>
-                </div>
-                {isOwner && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setEditingSettings(!editingSettings)}
-                  >
-                    {editingSettings ? (
-                      <>
-                        <X className="h-4 w-4 mr-2" />
-                        Cancelar
-                      </>
-                    ) : (
-                      <>
-                        <Edit className="h-4 w-4 mr-2" />
-                        Editar
-                      </>
-                    )}
-                  </Button>
-                )}
-              </div>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                Configurações da Família
+              </CardTitle>
+              <CardDescription>
+                Edite as configurações básicas da família
+              </CardDescription>
             </CardHeader>
-            <CardContent>
+                        <CardContent>
               {editingSettings && isOwner ? (
                 <div className="space-y-4">
                   <div>
@@ -488,7 +572,6 @@ export const SimpleFamilyManager = () => {
                     <Button
                       onClick={saveSettings}
                       disabled={saveLoading}
-                      className="flex-1"
                     >
                       {saveLoading ? (
                         <>
@@ -502,10 +585,17 @@ export const SimpleFamilyManager = () => {
                         </>
                       )}
                     </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingSettings(false)}
+                    >
+                      <X className="h-4 w-4 mr-2" />
+                      Cancelar
+                    </Button>
                   </div>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
                     <p className="font-medium">Nome: {currentFamily.nome}</p>
                     <p className="text-sm text-muted-foreground">
@@ -522,7 +612,16 @@ export const SimpleFamilyManager = () => {
                     </div>
                   </div>
                   
-                  {!isOwner && (
+                  {isOwner ? (
+                    <Button
+                      variant="outline"
+                      onClick={() => setEditingSettings(true)}
+                      className="w-full"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Editar Configurações
+                    </Button>
+                  ) : (
                     <p className="text-xs text-muted-foreground">
                       Apenas o dono da família pode editar estas configurações.
                     </p>
@@ -552,80 +651,148 @@ export const SimpleFamilyManager = () => {
               ) : (
                 <div className="space-y-4">
                   {/* Lista de Membros */}
-                  <div className="space-y-2">
+                  <div className="grid gap-3">
                     {familyMembers.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <div>
-                            <p className="font-medium">{member.profile?.nome || 'Utilizador'}</p>
+                      <div key={member.id} className="p-4 border rounded-lg">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium">{member.profile?.nome || 'Utilizador'}</p>
+                              <Badge variant={getRoleBadgeVariant(member.role)}>
+                                {getRoleDisplayName(member.role)}
+                              </Badge>
+                            </div>
                             <p className="text-sm text-muted-foreground">{member.profile?.email}</p>
                           </div>
-                          <Badge variant={getRoleBadgeVariant(member.role)}>
-                            {getRoleDisplayName(member.role)}
-                          </Badge>
+                          
+                          {isOwner && member.role !== 'owner' && (
+                            <div className="flex items-center gap-2 ml-4">
+                              <Select
+                                value={member.role}
+                                onValueChange={(newRole) => updateMemberRole(member.user_id, newRole, member.profile?.nome)}
+                              >
+                                <SelectTrigger className="w-36">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="admin">Administrador</SelectItem>
+                                  <SelectItem value="member">Membro</SelectItem>
+                                  <SelectItem value="viewer">Visualizador</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button variant="outline" size="sm">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Remover membro</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Tem a certeza que quer remover {member.profile?.nome} da família? Esta ação não pode ser desfeita.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => removeMember(member.user_id, member.profile?.nome)}
+                                      className="bg-red-600 hover:bg-red-700"
+                                    >
+                                      Remover
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          )}
                         </div>
-                        
-                        {isOwner && member.role !== 'owner' && (
-                          <div className="flex items-center gap-2">
-                            <Select
-                              value={member.role}
-                              onValueChange={(newRole) => updateMemberRole(member.user_id, newRole, member.profile?.nome)}
-                            >
-                              <SelectTrigger className="w-32">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Administrador</SelectItem>
-                                <SelectItem value="member">Membro</SelectItem>
-                                <SelectItem value="viewer">Visualizador</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <Button variant="outline" size="sm">
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Remover membro</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    Tem a certeza que quer remover {member.profile?.nome} da família? Esta ação não pode ser desfeita.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => removeMember(member.user_id, member.profile?.nome)}
-                                    className="bg-red-600 hover:bg-red-700"
-                                  >
-                                    Remover
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </div>
-                        )}
                       </div>
                     ))}
                   </div>
                   
-                  {/* Convidar Novo Membro - Em desenvolvimento */}
-                  <div className="border-t pt-4">
-                    <h4 className="font-medium mb-3 flex items-center gap-2">
-                      <UserPlus className="h-4 w-4" />
-                      Convidar Novo Membro
-                    </h4>
-                    <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                      <p className="text-sm text-orange-800">
-                        🚧 Funcionalidade em desenvolvimento
-                      </p>
-                      <p className="text-xs text-orange-600 mt-1">
-                        Em breve poderá convidar novos membros por email
-                      </p>
+                  {/* Convites Pendentes */}
+                  {pendingInvites.length > 0 && (
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-3">Convites Pendentes</h4>
+                      <div className="space-y-2">
+                        {pendingInvites.map((invite) => (
+                          <div key={invite.id} className="flex items-center justify-between p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                            <div>
+                              <p className="font-medium text-sm">{invite.email}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {getRoleDisplayName(invite.role)} • Expira em {new Date(invite.expires_at).toLocaleDateString('pt-PT')}
+                              </p>
+                            </div>
+                            {isOwner && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => cancelInvite(invite.id, invite.email)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
+
+                  {/* Convidar Novo Membro */}
+                  {isOwner && (
+                    <div className="border-t pt-4">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <UserPlus className="h-4 w-4" />
+                        Convidar Novo Membro
+                      </h4>
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="invite-email">Email</Label>
+                          <Input
+                            id="invite-email"
+                            type="email"
+                            value={inviteEmail}
+                            onChange={(e) => setInviteEmail(e.target.value)}
+                            placeholder="email@exemplo.com"
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label htmlFor="invite-role">Papel</Label>
+                          <Select value={inviteRole} onValueChange={setInviteRole}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="admin">Administrador</SelectItem>
+                              <SelectItem value="member">Membro</SelectItem>
+                              <SelectItem value="viewer">Visualizador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <Button
+                          onClick={inviteMember}
+                          disabled={inviteLoading || !inviteEmail.trim()}
+                          className="w-full"
+                        >
+                          {inviteLoading ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                              A enviar...
+                            </>
+                          ) : (
+                            <>
+                              <UserPlus className="h-4 w-4 mr-2" />
+                              Enviar Convite
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
