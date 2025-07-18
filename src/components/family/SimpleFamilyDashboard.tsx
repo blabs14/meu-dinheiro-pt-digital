@@ -9,51 +9,94 @@ import { Users, Settings, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export const SimpleFamilyDashboard = () => {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [currentFamily, setCurrentFamily] = useState<any>(null);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [debugData, setDebugData] = useState<any>(null);
+
+  // Teste de autenticação
+  useEffect(() => {
+    console.log('🔍 SimpleFamilyDashboard - User:', user);
+    console.log('🔍 SimpleFamilyDashboard - User ID:', user?.id);
+    console.log('🔍 SimpleFamilyDashboard - User Email:', user?.email);
+    console.log('🔍 SimpleFamilyDashboard - Auth Loading:', authLoading);
+  }, [user, authLoading]);
 
   useEffect(() => {
-    if (user) {
+    if (user && !authLoading) {
+      console.log('🔍 User carregado, iniciando loadData');
       loadData();
+    } else {
+      console.log('🔍 User ainda não carregado ou authLoading:', { user: !!user, authLoading });
+      setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   const loadData = async () => {
-    if (!user) return;
+    if (!user) {
+      console.log('❌ Nenhum utilizador autenticado');
+      return;
+    }
 
     try {
       setLoading(true);
-      console.log('🔍 Carregando dados para user:', user.id);
+      console.log('🔍 === INÍCIO DO CARREGAMENTO ===');
+      console.log('🔍 User ID:', user.id);
+      console.log('🔍 User Email:', user.email);
 
       const { data, error } = await supabase
         .rpc('get_user_family_data', { p_user_id: user.id });
 
-      console.log('🔍 Resposta:', { data, error });
+      console.log('🔍 === RESPOSTA DO SUPABASE ===');
+      console.log('🔍 Data:', data);
+      console.log('🔍 Error:', error);
+      console.log('🔍 Data type:', typeof data);
+      console.log('🔍 Data is array:', Array.isArray(data));
+      console.log('🔍 Data JSON:', JSON.stringify(data, null, 2));
+      
+      // Guardar dados para debug
+      setDebugData({ data, error });
 
       if (error) {
         console.error('❌ Erro:', error);
         setCurrentFamily(null);
+        toast({
+          title: "Erro ao carregar família",
+          description: error.message,
+          variant: "destructive"
+        });
         return;
       }
 
-      if (data && Array.isArray(data) && data.length > 0) {
-        const response = data[0] as any;
-        console.log('🔍 Dados processados:', response);
+      // Processar resposta
+      if (data) {
+        console.log('🔍 === PROCESSAMENTO DOS DADOS ===');
         
-        if (response.family) {
-          setCurrentFamily(response.family);
-          console.log('✅ Família definida:', response.family.nome);
-          toast({
-            title: "Família carregada",
-            description: `Bem-vindo à ${response.family.nome}`,
-          });
+        // A função agora retorna diretamente um array com os dados
+        if (Array.isArray(data) && data.length > 0) {
+          const familyInfo = data[0] as any;
+          console.log('🔍 Family info:', familyInfo);
+          
+          if (familyInfo && familyInfo.family) {
+            console.log('✅ FAMÍLIA ENCONTRADA:', familyInfo.family);
+            setCurrentFamily(familyInfo.family);
+            toast({
+              title: "Família carregada",
+              description: `Bem-vindo à ${familyInfo.family.nome}`,
+            });
+          } else {
+            console.log('❌ Sem dados de família no familyInfo');
+            setCurrentFamily(null);
+          }
+        } else {
+          console.log('❌ Data não é um array ou está vazio');
+          setCurrentFamily(null);
         }
       } else {
-        console.log('ℹ️ Nenhuma família encontrada');
+        console.log('❌ Sem dados na resposta');
         setCurrentFamily(null);
       }
 
@@ -66,23 +109,106 @@ export const SimpleFamilyDashboard = () => {
       });
     } finally {
       setLoading(false);
+      console.log('🔍 === FIM DO CARREGAMENTO ===');
     }
   };
 
-  if (loading) {
+  // Função de teste manual
+  const testManual = async () => {
+    console.log('🔍 === TESTE MANUAL ===');
+    if (!user) {
+      console.log('❌ Sem utilizador');
+      return;
+    }
+
+    try {
+      // Teste 1: Verificar sessão
+      const { data: session } = await supabase.auth.getSession();
+      console.log('🔍 Sessão:', session);
+
+      // Teste 2: Chamar função diretamente
+      const { data, error } = await supabase
+        .rpc('get_user_family_data', { p_user_id: user.id });
+      
+      console.log('🔍 Teste manual - Data:', data);
+      console.log('🔍 Teste manual - Error:', error);
+      console.log('🔍 Teste manual - Data JSON:', JSON.stringify(data, null, 2));
+
+      // Atualizar debug data
+      setDebugData({ data, error });
+
+    } catch (error) {
+      console.error('❌ Erro no teste manual:', error);
+    }
+  };
+
+  if (authLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">A carregar família...</p>
+          <p className="text-muted-foreground">A carregar autenticação...</p>
         </div>
       </div>
     );
   }
 
-  if (!currentFamily) {
+  if (!user) {
     return (
-      <div className="max-w-4xl mx-auto p-4 space-y-6">
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <h2 className="text-2xl font-bold mb-2">Não Autenticado</h2>
+          <p className="text-muted-foreground">Faça login para continuar</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-6xl mx-auto p-4 space-y-6">
+
+
+      {/* Conteúdo Principal */}
+      {loading ? (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">A carregar família...</p>
+        </div>
+      ) : currentFamily ? (
+        <>
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-3xl font-bold flex items-center gap-2">
+                <Users className="h-8 w-8 text-primary" />
+                {currentFamily.nome}
+              </h1>
+              <p className="text-muted-foreground mt-1">
+                Dashboard da família
+              </p>
+            </div>
+            <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
+              <Settings className="h-4 w-4 mr-2" />
+              Gerir Família
+            </Button>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Informações da Família</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <p><strong>Nome:</strong> {currentFamily.nome}</p>
+                <p><strong>ID:</strong> {currentFamily.id}</p>
+                <p><strong>Criado em:</strong> {new Date(currentFamily.created_at).toLocaleDateString('pt-PT')}</p>
+                {currentFamily.description && (
+                  <p><strong>Descrição:</strong> {currentFamily.description}</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </>
+      ) : (
         <div className="text-center py-12">
           <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-2">Nenhuma Família Encontrada</h2>
@@ -93,86 +219,8 @@ export const SimpleFamilyDashboard = () => {
             <Settings className="h-4 w-4 mr-2" />
             Ir para Configurações
           </Button>
-          <Button variant="outline" onClick={loadData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Tentar Novamente
-          </Button>
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2">
-            <Users className="h-8 w-8 text-primary" />
-            {currentFamily.nome}
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Dashboard da família
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={loadData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Atualizar
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => navigate('/settings')}>
-            <Settings className="h-4 w-4 mr-2" />
-            Gerir Família
-          </Button>
-        </div>
-      </div>
-
-      {/* Info da Família */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações da Família</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            <p><strong>Nome:</strong> {currentFamily.nome}</p>
-            <p><strong>ID:</strong> {currentFamily.id}</p>
-            <p><strong>Criado em:</strong> {new Date(currentFamily.created_at).toLocaleDateString('pt-PT')}</p>
-            {currentFamily.description && (
-              <p><strong>Descrição:</strong> {currentFamily.description}</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Placeholder para futuras funcionalidades */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Funcionalidades em Desenvolvimento</CardTitle>
-          <CardDescription>
-            Estas funcionalidades serão adicionadas em breve
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">📊 Estatísticas Familiares</h3>
-              <p className="text-sm text-muted-foreground">Rendimento, despesas e poupança agregados</p>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">👥 Membros da Família</h3>
-              <p className="text-sm text-muted-foreground">Lista e gestão de membros</p>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">🎯 Metas Familiares</h3>
-              <p className="text-sm text-muted-foreground">Objetivos partilhados</p>
-            </div>
-            <div className="p-4 border rounded-lg">
-              <h3 className="font-semibold mb-2">💰 Transações</h3>
-              <p className="text-sm text-muted-foreground">Histórico financeiro familiar</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      )}
     </div>
   );
 }; 
