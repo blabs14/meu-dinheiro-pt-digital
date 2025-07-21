@@ -1,41 +1,45 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { TrendingUp, TrendingDown } from 'lucide-react';
 import { format, subMonths, startOfMonth } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
-interface MonthlyData {
+interface ChartData {
   month: string;
-  monthLabel: string;
   receitas: number;
   despesas: number;
-  saldo: number;
+  poupanca: number;
 }
 
-interface MonthlyTrendChartProps {
-  refreshTrigger?: number;
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    name: string;
+    value: number;
+    color: string;
+  }>;
+  label?: string;
 }
 
-export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) => {
+export interface MonthlyTrendChartProps {
+  familyId?: string;
+}
+
+export const MonthlyTrendChart = ({ familyId }: MonthlyTrendChartProps) => {
   const { user } = useAuth();
-  const [data, setData] = useState<MonthlyData[]>([]);
+  const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [trend, setTrend] = useState<'up' | 'down' | 'stable'>('stable');
 
-  useEffect(() => {
-    if (user) {
-      loadMonthlyTrend();
-    }
-  }, [user, refreshTrigger]);
-
-  const loadMonthlyTrend = async () => {
+  const loadMonthlyTrend = useCallback(async () => {
     try {
       setLoading(true);
       
       // Obter dados dos últimos 6 meses
-      const months: MonthlyData[] = [];
+      const months: ChartData[] = [];
       const currentDate = new Date();
       
       for (let i = 5; i >= 0; i--) {
@@ -48,7 +52,7 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
           monthLabel,
           receitas: 0,
           despesas: 0,
-          saldo: 0
+          poupanca: 0
         });
       }
 
@@ -56,13 +60,19 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
       const sixMonthsAgo = format(startOfMonth(subMonths(currentDate, 5)), 'yyyy-MM-dd');
       const nextMonth = format(startOfMonth(subMonths(currentDate, -1)), 'yyyy-MM-dd');
 
-      const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select('valor, data, tipo')
-        .eq('user_id', user!.id)
-        .gte('data', sixMonthsAgo)
-        .lt('data', nextMonth)
-        .order('data');
+      let query = supabase.from('transactions').select('valor, data, tipo');
+      
+      // Se familyId for fornecido, filtrar apenas transações dessa família
+      if (familyId) {
+        query = query.eq('family_id', familyId);
+      } else {
+        // Se não for fornecido, mostrar apenas transações pessoais (family_id IS NULL)
+        query = query.is('family_id', null);
+      }
+      
+      query = query.gte('data', sixMonthsAgo).lt('data', nextMonth).order('data');
+
+      const { data: transactions, error } = await query;
 
       if (error) throw error;
 
@@ -83,7 +93,7 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
 
       // Calcular saldo para cada mês
       months.forEach(month => {
-        month.saldo = month.receitas - month.despesas;
+        month.poupanca = month.receitas - month.despesas;
       });
 
       setData(months);
@@ -92,7 +102,13 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
     } finally {
       setLoading(false);
     }
-  };
+  }, [familyId]);
+
+  useEffect(() => {
+    if (user) {
+      loadMonthlyTrend();
+    }
+  }, [user, familyId, loadMonthlyTrend]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {
@@ -101,21 +117,16 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
     }).format(value);
   };
 
-  const CustomTooltip = ({ active, payload, label }: any) => {
+  const CustomTooltip = ({ active, payload, label }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       return (
         <div className="bg-card border rounded-lg p-3 shadow-lg">
           <p className="font-medium mb-2">{label}</p>
-          {payload.map((entry: any, index: number) => (
+          {payload.map((entry, index) => (
             <p key={index} className="text-sm" style={{ color: entry.color }}>
               {entry.name}: {formatCurrency(entry.value)}
             </p>
           ))}
-          {payload.length > 1 && (
-            <p className="text-sm font-medium mt-1 pt-1 border-t">
-              Saldo: {formatCurrency(payload[0].payload.saldo)}
-            </p>
-          )}
         </div>
       );
     }
@@ -178,7 +189,7 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
       <CardContent>
         <div className="h-[400px]">
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+            <LineChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
               <XAxis 
                 dataKey="monthLabel" 
@@ -192,19 +203,21 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
               />
               <Tooltip content={<CustomTooltip />} />
               <Legend />
-              <Bar 
+              <Line 
+                type="monotone"
                 dataKey="receitas" 
                 name="Receitas" 
-                fill="rgb(34, 197, 94)" 
-                radius={[2, 2, 0, 0]}
+                stroke="rgb(34, 197, 94)" 
+                strokeWidth={2}
               />
-              <Bar 
+              <Line 
+                type="monotone"
                 dataKey="despesas" 
                 name="Despesas" 
-                fill="rgb(239, 68, 68)" 
-                radius={[2, 2, 0, 0]}
+                stroke="rgb(239, 68, 68)" 
+                strokeWidth={2}
               />
-            </BarChart>
+            </LineChart>
           </ResponsiveContainer>
         </div>
 
@@ -216,9 +229,9 @@ export const MonthlyTrendChart = ({ refreshTrigger }: MonthlyTrendChartProps) =>
                 {month.monthLabel}
               </p>
               <p className={`text-lg font-bold ${
-                month.saldo >= 0 ? 'text-income' : 'text-expense'
+                month.poupanca >= 0 ? 'text-income' : 'text-expense'
               }`}>
-                {formatCurrency(month.saldo)}
+                {formatCurrency(month.poupanca)}
               </p>
               <div className="text-xs text-muted-foreground mt-1">
                 <div>↗️ {formatCurrency(month.receitas)}</div>

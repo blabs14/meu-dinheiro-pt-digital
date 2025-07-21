@@ -4,7 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Euro } from 'lucide-react';
 import { NotificationSystem } from '@/components/notifications/NotificationSystem';
 import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
-import { WelcomeTutorial } from '@/components/onboarding';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
@@ -15,14 +14,11 @@ export const Layout = ({ children }: LayoutProps) => {
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showTutorial, setShowTutorial] = useState(false);
+
+  console.log('🔍 [Layout] Rendering with user:', user);
 
   const isActive = (path: string) => {
     return location.pathname === path;
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
   };
 
   const handleSignOut = async () => {
@@ -91,7 +87,7 @@ export const Layout = ({ children }: LayoutProps) => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => setShowTutorial(true)}
+              onClick={() => {}} // Removed setShowTutorial(true)
               className="text-sm"
             >
               Tutorial
@@ -107,12 +103,6 @@ export const Layout = ({ children }: LayoutProps) => {
       <main>
         {children}
       </main>
-
-      {/* Tutorial de Boas-vindas */}
-      <WelcomeTutorial
-        open={showTutorial}
-        onOpenChange={handleTutorialClose}
-      />
     </div>
   );
 }; 

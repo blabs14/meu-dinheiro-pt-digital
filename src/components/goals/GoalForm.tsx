@@ -13,6 +13,7 @@ import { CalendarIcon, Target, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 interface Goal {
   id?: string;
@@ -34,6 +35,8 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [deadline, setDeadline] = useState<Date | undefined>();
+  const [isFamily, setIsFamily] = useState(false);
+  const [familyId, setFamilyId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -68,6 +71,19 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
     }
   }, [open, goal]);
 
+  useEffect(() => {
+    // Buscar family_id do utilizador autenticado
+    const fetchFamily = async () => {
+      if (user) {
+        const { data } = await supabase.rpc('get_user_family_data', { p_user_id: user.id });
+        if (data && Array.isArray(data) && (data[0] as { family?: { id: string } })?.family?.id) {
+          setFamilyId((data[0] as { family: { id: string } }).family.id);
+        }
+      }
+    };
+    fetchFamily();
+  }, [user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -77,10 +93,13 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
       const goalData = {
         user_id: user.id,
         nome: formData.nome,
-        valor_meta: parseFloat(formData.valor_meta),
+        valor_objetivo: parseFloat(formData.valor_meta), // Corrigido: usar valor_objetivo
         valor_atual: parseFloat(formData.valor_atual),
-        prazo: deadline ? format(deadline, 'yyyy-MM-dd') : null
+        prazo: deadline ? format(deadline, 'yyyy-MM-dd') : null,
+        family_id: isFamily && familyId ? familyId : null
       };
+
+      console.log('🔍 [GoalForm] Criando meta com dados:', goalData);
 
       if (goal?.id) {
         // Atualizar meta existente
@@ -105,7 +124,7 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
 
         toast({
           title: "Sucesso",
-          description: "Meta criada com sucesso",
+          description: isFamily ? "Meta familiar criada com sucesso" : "Meta pessoal criada com sucesso",
         });
       }
 
@@ -117,13 +136,16 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
         descricao: ''
       });
       setDeadline(undefined);
+      setIsFamily(false);
       onOpenChange(false);
       onSuccess?.();
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      console.error('❌ [GoalForm] Erro ao guardar meta:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao guardar meta';
       toast({
         title: "Erro",
-        description: error.message || "Erro ao guardar meta",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -222,6 +244,11 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="flex items-center gap-2 mb-4">
+            <Switch id="is-family" checked={isFamily} onCheckedChange={setIsFamily} />
+            <label htmlFor="is-family" className="text-sm">Esta meta é da família?</label>
           </div>
 
           <DialogFooter>

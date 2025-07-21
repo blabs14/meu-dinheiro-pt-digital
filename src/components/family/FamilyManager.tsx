@@ -150,60 +150,53 @@ export const FamilyManager = () => {
 
         if (memberData && memberData.length > 0) {
           const member = memberData[0];
-          setCurrentFamily(member.families as any);
+          setCurrentFamily(member.families as FamilyData);
           setUserRole(member.role);
         } else {
           setCurrentFamily(null);
           setUserRole('member');
         }
       } else if (familyData && Array.isArray(familyData) && familyData.length > 0) {
-        const familyResponse = familyData[0] as any;
+        const familyResponse = familyData[0] as unknown as {
+          family: FamilyData;
+          family_member: FamilyMember;
+        };
         console.log('🔍 Debug - Resposta da função:', familyResponse);
         
         if (familyResponse.family && familyResponse.family_member) {
           const family = familyResponse.family;
           const member = familyResponse.family_member;
           
-          console.log('🔍 FamilyManager - Resposta da função SQL:', familyResponse);
+          console.log('🔍 FamilyManager - Dados encontrados:', { family, member });
           
-          if (familyResponse.family && familyResponse.family_member) {
-            const family = familyResponse.family;
-            const member = familyResponse.family_member;
-            
-            console.log('🔍 FamilyManager - Dados encontrados:', { family, member });
-            
-            setCurrentFamily({
-              id: family.id,
-              nome: family.nome,
-              description: family.description,
-              created_by: family.created_by,
-              created_at: family.created_at,
-              updated_at: family.updated_at,
-              settings: family.settings || {
-                allow_view_all: true,
-                allow_add_transactions: true,
-                require_approval: false
-              }
-            });
-            setUserRole(member.role);
-            
-            console.log('✅ FamilyManager - Família definida:', family.nome);
-            
-            // Carregar membros da família
-            await loadFamilyMembers(family.id);
-          } else {
-            setCurrentFamily(null);
-            setUserRole('member');
-          }
-
+          setCurrentFamily({
+            id: family.id,
+            nome: family.nome,
+            description: family.description,
+            created_by: family.created_by,
+            created_at: family.created_at,
+            updated_at: family.updated_at,
+            settings: family.settings || {
+              allow_view_all: true,
+              allow_add_transactions: true,
+              require_approval: false
+            }
+          });
+          setUserRole(member.role);
+          
+          console.log('✅ FamilyManager - Família definida:', family.nome);
+          
+          // Carregar membros da família
+          await loadFamilyMembers(family.id);
+        } else {
+          setCurrentFamily(null);
+          setUserRole('member');
+        }
       } else {
         setCurrentFamily(null);
         setUserRole('member');
       }
-
-
-
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Erro ao carregar dados da família:', error);
       // Não mostrar toast de erro aqui para evitar spam
     } finally {

@@ -1,7 +1,7 @@
-import { SimpleFamilyDashboard } from '@/components/family/SimpleFamilyDashboard';
+import { FamilyDashboardVisual } from '@/components/family/FamilyDashboardVisual';
 
 const Family = () => {
-  return <SimpleFamilyDashboard />;
+  return <FamilyDashboardVisual />;
 };
 
 export default Family; 

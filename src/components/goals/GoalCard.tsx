@@ -11,7 +11,7 @@ import { pt } from 'date-fns/locale';
 interface Goal {
   id: string;
   nome: string;
-  valor_meta: number;
+  valor_objetivo: number;
   valor_atual: number;
   prazo: string | null;
   created_at: string;
@@ -34,9 +34,9 @@ export const GoalCard = ({ goal, onEdit, onDelete, onUpdateAmount }: GoalCardPro
     }).format(value);
   };
 
-  const progressPercentage = goal.valor_meta > 0 ? Math.min((goal.valor_atual / goal.valor_meta) * 100, 100) : 0;
-  const remainingAmount = Math.max(goal.valor_meta - goal.valor_atual, 0);
-  const isCompleted = goal.valor_atual >= goal.valor_meta;
+  const progressPercentage = goal.valor_objetivo > 0 ? Math.min((goal.valor_atual / goal.valor_objetivo) * 100, 100) : 0;
+  const remainingAmount = Math.max(goal.valor_objetivo - goal.valor_atual, 0);
+  const isCompleted = goal.valor_atual >= goal.valor_objetivo;
 
   // Cálculos de prazo
   const hasDeadline = !!goal.prazo;
@@ -56,7 +56,7 @@ export const GoalCard = ({ goal, onEdit, onDelete, onUpdateAmount }: GoalCardPro
   const handleQuickAdd = async (amount: number) => {
     setIsUpdating(true);
     try {
-      const newAmount = Math.min(goal.valor_atual + amount, goal.valor_meta);
+      const newAmount = Math.min(goal.valor_atual + amount, goal.valor_objetivo);
       await onUpdateAmount(goal.id, newAmount);
     } finally {
       setIsUpdating(false);
@@ -145,7 +145,7 @@ export const GoalCard = ({ goal, onEdit, onDelete, onUpdateAmount }: GoalCardPro
           <div className="text-center p-3 border rounded-lg">
             <p className="text-sm text-muted-foreground mb-1">Meta</p>
             <p className="text-lg font-bold text-primary">
-              {formatCurrency(goal.valor_meta)}
+              {formatCurrency(goal.valor_objetivo)}
             </p>
           </div>
         </div>

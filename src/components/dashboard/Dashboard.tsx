@@ -1,127 +1,213 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   TrendingUp, 
   TrendingDown, 
   PiggyBank, 
+  Target, 
+  Plus, 
   Calendar,
-  Plus,
-  Target,
-  CreditCard
+  CreditCard,
+  Filter
 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { RecentTransactions } from '@/components/transactions/RecentTransactions';
-import { ExpensesPieChart, MonthlyTrendChart, SavingsProgressChart } from '@/components/charts';
-import { WelcomeTutorial } from '@/components/onboarding';
-import { useNavigate } from 'react-router-dom';
+import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
+import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
+import { SavingsProgressChart } from '@/components/charts/SavingsProgressChart';
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
+import { useOnboarding } from '@/hooks/useOnboarding';
+import { TransactionDebug } from '@/components/debug/TransactionDebug';
 
 interface DashboardStats {
-  totalIncome: number;
-  totalExpenses: number;
-  savingsRate: number;
+  receitas: number;
+  despesas: number;
+  saldo: number;
+  metasAtivas: number;
+  poupancaMensal: number;
+  taxaPoupanca: number;
   upcomingBills: any[];
 }
 
 export const Dashboard = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const navigate = useNavigate();
+  const { needsOnboarding, completeOnboarding } = useOnboarding();
+  const [loading, setLoading] = useState(true);
+  const [showTransactionForm, setShowTransactionForm] = useState(false);
+  const [transactionType, setTransactionType] = useState<'receita' | 'despesa'>('despesa');
+  const [selectedMonth, setSelectedMonth] = useState<string>('current');
   const [stats, setStats] = useState<DashboardStats>({
-    totalIncome: 0,
-    totalExpenses: 0,
-    savingsRate: 0,
+    receitas: 0,
+    despesas: 0,
+    saldo: 0,
+    metasAtivas: 0,
+    poupancaMensal: 0,
+    taxaPoupanca: 0,
     upcomingBills: []
   });
-  const [loading, setLoading] = useState(true);
-  const [transactionFormOpen, setTransactionFormOpen] = useState(false);
-  const [transactionType, setTransactionType] = useState<'receita' | 'despesa'>('despesa');
-  const [refreshTransactions, setRefreshTransactions] = useState(0);
-  const [showTutorial, setShowTutorial] = useState(false);
 
-  useEffect(() => {
-    if (user) {
-      loadDashboardData();
-      
-      // Verificar se é a primeira vez no dashboard
-      const hasSeenTutorial = localStorage.getItem(`tutorial_seen_${user.id}`);
-      if (!hasSeenTutorial) {
-        // Mostrar tutorial após um pequeno delay
-        setTimeout(() => {
-          setShowTutorial(true);
-        }, 1000);
-      }
+  // Gerar opções de meses
+  const getMonthOptions = () => {
+    const options = [
+      { value: 'current', label: 'Mês Atual' },
+      { value: 'all', label: 'Todos os Meses' }
+    ];
+    
+    // Adicionar últimos 12 meses
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = date.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
     }
-  }, [user]);
+    
+    return options;
+  };
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
+    if (!user) {
+      console.log('⚠️ [Dashboard] Sem utilizador autenticado');
+      return;
+    }
+
     try {
       setLoading(true);
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
+      console.log('🔍 [Dashboard] Iniciando carregamento de dados');
+      console.log('🔍 [Dashboard] User ID:', user.id);
+      console.log('🔍 [Dashboard] Filtro de mês:', selectedMonth);
+
+      // Verificar sessão
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      console.log('🔍 [Dashboard] Sessão ativa:', !!session);
       
-      // Get current month transactions
+      if (!session) {
+        console.error('❌ [Dashboard] Sem sessão ativa');
+        throw new Error('Sem sessão ativa');
+      }
+
+      // Carregar transações pessoais (family_id IS NULL)
+      console.log('🔍 [Dashboard] Carregando transações pessoais...');
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('valor, tipo')
-        .eq('user_id', user!.id)
-        .gte('data', `${currentMonth}-01`)
-        .lt('data', `${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10)}`);
+        .select('*')
+        .eq('user_id', user.id)
+        .is('family_id', null);
 
-      if (transactionsError) throw transactionsError;
+      console.log('🔍 [Dashboard] Transações pessoais:', transactions);
+      console.log('🔍 [Dashboard] Erro transações:', transactionsError);
 
-      // Calculate totals
-      const income = transactions
-        ?.filter(t => t.tipo === 'receita')
-        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+      if (transactionsError) {
+        console.error('❌ [Dashboard] Erro ao carregar transações:', transactionsError);
+        throw transactionsError;
+      }
+
+      // Carregar metas pessoais (family_id IS NULL)
+      console.log('🔍 [Dashboard] Carregando metas pessoais...');
+      const { data: goals, error: goalsError } = await supabase
+        .from('goals')
+        .select('*')
+        .eq('user_id', user.id)
+        .is('family_id', null)
+        .eq('status', 'active');
+
+      console.log('🔍 [Dashboard] Metas pessoais:', goals);
+      console.log('🔍 [Dashboard] Erro metas:', goalsError);
+
+      if (goalsError) throw goalsError;
+
+      // Filtrar transações baseado na seleção
+      let filteredTransactions = transactions || [];
+      
+      if (selectedMonth === 'current') {
+        // Mês atual
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
         
-      const expenses = transactions
-        ?.filter(t => t.tipo === 'despesa')
-        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+        filteredTransactions = transactions?.filter(t => {
+          const transactionDate = new Date(t.data);
+          return transactionDate.getMonth() === currentMonth &&
+                 transactionDate.getFullYear() === currentYear;
+        }) || [];
+      } else if (selectedMonth !== 'all') {
+        // Mês específico selecionado
+        const [year, month] = selectedMonth.split('-').map(Number);
+        
+        filteredTransactions = transactions?.filter(t => {
+          const transactionDate = new Date(t.data);
+          return transactionDate.getMonth() === (month - 1) &&
+                 transactionDate.getFullYear() === year;
+        }) || [];
+      }
+      // Se selectedMonth === 'all', usar todas as transações
 
-      // Get upcoming fixed expenses
-      const { data: fixedExpenses, error: fixedError } = await supabase
-        .from('fixed_expenses')
-        .select('nome, valor, dia_vencimento')
-        .eq('user_id', user!.id)
-        .eq('ativa', true);
+      // Calcular estatísticas
+      const receitas = filteredTransactions
+        .filter(t => t.tipo === 'receita')
+        .reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
 
-      if (fixedError) throw fixedError;
+      const despesas = filteredTransactions
+        .filter(t => t.tipo === 'despesa')
+        .reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
 
-      // Calculate savings rate
-      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+      const saldo = receitas - despesas;
+      const taxaPoupanca = receitas > 0 ? (saldo / receitas) * 100 : 0;
 
-      setStats({
-        totalIncome: income,
-        totalExpenses: expenses,
-        savingsRate,
-        upcomingBills: fixedExpenses || []
+      console.log('🔍 [Dashboard] Estatísticas calculadas:', {
+        receitas,
+        despesas,
+        saldo,
+        taxaPoupanca: taxaPoupanca.toFixed(2),
+        metasAtivas: goals?.length || 0,
+        totalTransacoes: filteredTransactions.length,
+        filtro: selectedMonth
       });
 
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar dados do dashboard",
-        variant: "destructive"
+      setStats({
+        receitas,
+        despesas,
+        saldo,
+        metasAtivas: goals?.length || 0,
+        poupancaMensal: saldo,
+        taxaPoupanca,
+        upcomingBills: []
+      });
+    } catch (error) {
+      console.error('❌ [Dashboard] Erro ao carregar dados:', error);
+      setStats({
+        receitas: 0,
+        despesas: 0,
+        saldo: 0,
+        metasAtivas: 0,
+        poupancaMensal: 0,
+        taxaPoupanca: 0,
+        upcomingBills: []
       });
     } finally {
       setLoading(false);
     }
+  }, [user, selectedMonth]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  const handleAddTransaction = (type: 'receita' | 'despesa') => {
+    setTransactionType(type);
+    setShowTransactionForm(true);
   };
 
   const handleTransactionSuccess = () => {
+    setShowTransactionForm(false);
     loadDashboardData();
-    setRefreshTransactions(prev => prev + 1);
-  };
-
-  const handleTutorialClose = () => {
-    setShowTutorial(false);
-    if (user) {
-      localStorage.setItem(`tutorial_seen_${user.id}`, 'true');
-    }
   };
 
   const formatCurrency = (value: number) => {
@@ -137,19 +223,49 @@ export const Dashboard = () => {
     return 'text-expense';
   };
 
+  const getMonthLabel = () => {
+    if (selectedMonth === 'current') return 'Este mês';
+    if (selectedMonth === 'all') return 'Todos os meses';
+    
+    const [year, month] = selectedMonth.split('-').map(Number);
+    const date = new Date(year, month - 1);
+    return date.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+  };
+
+  if (needsOnboarding) {
+    return <OnboardingWizard onComplete={completeOnboarding} />;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">A carregar...</p>
-        </div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
+      {/* Filtro de Mês */}
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Dashboard Pessoal</h1>
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Selecionar período" />
+            </SelectTrigger>
+            <SelectContent>
+              {getMonthOptions().map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
@@ -159,9 +275,9 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-income">
-              {formatCurrency(stats.totalIncome)}
+              {formatCurrency(stats.receitas)}
             </div>
-            <p className="text-xs text-muted-foreground">Este mês</p>
+            <p className="text-xs text-muted-foreground">{getMonthLabel()}</p>
           </CardContent>
         </Card>
 
@@ -172,9 +288,9 @@ export const Dashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-expense">
-              {formatCurrency(stats.totalExpenses)}
+              {formatCurrency(stats.despesas)}
             </div>
-            <p className="text-xs text-muted-foreground">Este mês</p>
+            <p className="text-xs text-muted-foreground">{getMonthLabel()}</p>
           </CardContent>
         </Card>
 
@@ -184,11 +300,11 @@ export const Dashboard = () => {
             <PiggyBank className="h-4 w-4 text-savings" />
           </CardHeader>
           <CardContent>
-            <div className={`text-2xl font-bold ${getSavingsColor(stats.savingsRate)}`}>
-              {stats.savingsRate.toFixed(1)}%
+            <div className={`text-2xl font-bold ${getSavingsColor(stats.taxaPoupanca)}`}>
+              {stats.taxaPoupanca.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(stats.totalIncome - stats.totalExpenses)}
+              {formatCurrency(stats.saldo)}
             </p>
           </CardContent>
         </Card>
@@ -237,15 +353,15 @@ export const Dashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ExpensesPieChart refreshTrigger={refreshTransactions} />
-        <SavingsProgressChart refreshTrigger={refreshTransactions} />
+        <ExpensesPieChart familyId={null} selectedMonth={selectedMonth} />
+        <SavingsProgressChart familyId={null} selectedMonth={selectedMonth} />
       </div>
 
       {/* Monthly Trend Chart */}
-      <MonthlyTrendChart refreshTrigger={refreshTransactions} />
+      <MonthlyTrendChart familyId={null} selectedMonth={selectedMonth} />
 
       {/* Recent Transactions */}
-      <RecentTransactions refreshTrigger={refreshTransactions} />
+      <RecentTransactions familyId={null} />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -254,7 +370,7 @@ export const Dashboard = () => {
           variant="outline"
           onClick={() => {
             setTransactionType('despesa');
-            setTransactionFormOpen(true);
+            setShowTransactionForm(true);
           }}
         >
           <Plus className="h-6 w-6" />
@@ -266,7 +382,7 @@ export const Dashboard = () => {
           variant="outline"
           onClick={() => {
             setTransactionType('receita');
-            setTransactionFormOpen(true);
+            setShowTransactionForm(true);
           }}
         >
           <TrendingUp className="h-6 w-6" />
@@ -285,16 +401,10 @@ export const Dashboard = () => {
 
       {/* Transaction Form Modal */}
       <TransactionForm
-        open={transactionFormOpen}
-        onOpenChange={setTransactionFormOpen}
+        open={showTransactionForm}
+        onOpenChange={setShowTransactionForm}
         defaultType={transactionType}
         onSuccess={handleTransactionSuccess}
-      />
-
-      {/* Tutorial de Boas-vindas */}
-      <WelcomeTutorial
-        open={showTutorial}
-        onOpenChange={handleTutorialClose}
       />
     </div>
   );

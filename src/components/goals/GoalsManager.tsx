@@ -12,7 +12,7 @@ import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 interface Goal {
   id: string;
   nome: string;
-  valor_meta: number;
+  valor_objetivo: number; // Corrigido: usar valor_objetivo
   valor_atual: number;
   prazo: string | null;
   created_at: string;
@@ -20,9 +20,10 @@ interface Goal {
 
 interface GoalsManagerProps {
   refreshTrigger?: number;
+  familyId?: string;
 }
 
-export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
+export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [goals, setGoals] = useState<Goal[]>([]);
@@ -39,16 +40,28 @@ export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
   const loadGoals = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', user!.id)
-        .order('created_at', { ascending: false });
+      let query = supabase.from('goals').select('*');
+      
+      // Se familyId for fornecido, filtrar apenas metas dessa família
+      if (familyId) {
+        console.log('🔍 [GoalsManager] Carregando metas da família:', familyId);
+        query = query.eq('family_id', familyId);
+      } else {
+        // Se não for fornecido, mostrar apenas metas pessoais (sem family_id)
+        console.log('🔍 [GoalsManager] Carregando metas pessoais');
+        query = query.is('family_id', null);
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
+      
+      console.log('🔍 [GoalsManager] Metas carregadas:', data?.length || 0);
+      console.log('🔍 [GoalsManager] Metas:', data);
+      
       setGoals(data || []);
-    } catch (error) {
-      console.error('Erro ao carregar metas:', error);
+    } catch (error: unknown) {
+      console.error('❌ [GoalsManager] Erro ao carregar metas:', error);
       toast({
         title: "Erro",
         description: "Erro ao carregar metas",
@@ -94,7 +107,7 @@ export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
 
       // Check if goal was completed
       const goal = goals.find(g => g.id === goalId);
-      if (goal && newAmount >= goal.valor_meta && goal.valor_atual < goal.valor_meta) {
+      if (goal && newAmount >= goal.valor_objetivo && goal.valor_atual < goal.valor_objetivo) {
         toast({
           title: "🎉 Parabéns!",
           description: `Meta "${goal.nome}" foi atingida!`,
@@ -107,10 +120,12 @@ export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
       }
 
       loadGoals();
-    } catch (error: any) {
+    } catch (error) {
+      console.error('❌ [GoalsManager] Erro ao atualizar valor:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar valor';
       toast({
         title: "Erro",
-        description: error.message || "Erro ao atualizar valor",
+        description: errorMessage,
         variant: "destructive"
       });
     }
@@ -135,8 +150,8 @@ export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
 
   // Estatísticas
   const totalGoals = goals.length;
-  const completedGoals = goals.filter(g => g.valor_atual >= g.valor_meta).length;
-  const totalTargetAmount = goals.reduce((sum, g) => sum + g.valor_meta, 0);
+  const completedGoals = goals.filter(g => g.valor_atual >= g.valor_objetivo).length;
+  const totalTargetAmount = goals.reduce((sum, g) => sum + g.valor_objetivo, 0);
   const totalCurrentAmount = goals.reduce((sum, g) => sum + g.valor_atual, 0);
   const overallProgress = totalTargetAmount > 0 ? (totalCurrentAmount / totalTargetAmount) * 100 : 0;
 
@@ -163,10 +178,13 @@ export const GoalsManager = ({ refreshTrigger }: GoalsManagerProps) => {
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">
               <Target className="h-8 w-8 text-primary" />
-              Metas de Poupança
+              {familyId ? 'Metas da Família' : 'Metas de Poupança'}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Defina e acompanhe os seus objetivos financeiros
+              {familyId 
+                ? 'Metas partilhadas com a família'
+                : 'Defina e acompanhe os seus objetivos financeiros'
+              }
             </p>
           </div>
           <Button onClick={() => setFormOpen(true)} className="flex items-center gap-2">

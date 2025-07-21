@@ -17,9 +17,10 @@ interface SavingsData {
 
 interface SavingsProgressChartProps {
   refreshTrigger?: number;
+  familyId?: string;
 }
 
-export const SavingsProgressChart = ({ refreshTrigger }: SavingsProgressChartProps) => {
+export const SavingsProgressChart = ({ refreshTrigger, familyId }: SavingsProgressChartProps) => {
   const { user } = useAuth();
   const [data, setData] = useState<SavingsData>({
     totalIncome: 0,
@@ -34,7 +35,7 @@ export const SavingsProgressChart = ({ refreshTrigger }: SavingsProgressChartPro
     if (user) {
       loadSavingsData();
     }
-  }, [user, refreshTrigger]);
+  }, [user, refreshTrigger, familyId]);
 
   const loadSavingsData = async () => {
     try {
@@ -42,21 +43,35 @@ export const SavingsProgressChart = ({ refreshTrigger }: SavingsProgressChartPro
       const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
       
       // Buscar transações do mês atual
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('valor, tipo')
-        .eq('user_id', user!.id)
-        .gte('data', `${currentMonth}-01`)
+      let query = supabase.from('transactions').select('valor, tipo');
+      
+      // Se familyId for fornecido, filtrar apenas transações dessa família
+      if (familyId) {
+        query = query.eq('family_id', familyId);
+      } else {
+        // Se não for fornecido, mostrar apenas transações pessoais (family_id IS NULL)
+        query = query.is('family_id', null);
+      }
+      
+      const { data: transactions, error: transactionsError } = await query
+        .gte('data', `${currentMonth}-01}`)
         .lt('data', `${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10)}`);
 
       if (transactionsError) throw transactionsError;
 
-      // Buscar meta de poupança do perfil do utilizador
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('poupanca_mensal')
-        .eq('user_id', user!.id)
-        .single();
+      // Buscar meta de poupança do perfil do utilizador (apenas para dados pessoais)
+      let targetRate = 20; // Meta padrão
+      if (!familyId) {
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('poupanca_mensal')
+          .eq('user_id', user!.id)
+          .single();
+
+        if (!profileError && profile?.poupanca_mensal) {
+          targetRate = profile.poupanca_mensal;
+        }
+      }
 
       // Calcular totais
       const income = transactions
@@ -69,7 +84,6 @@ export const SavingsProgressChart = ({ refreshTrigger }: SavingsProgressChartPro
 
       const savingsAmount = income - expenses;
       const savingsRate = income > 0 ? (savingsAmount / income) * 100 : 0;
-      const targetRate = profile?.poupanca_mensal || 20; // Meta padrão de 20%
 
       setData({
         totalIncome: income,

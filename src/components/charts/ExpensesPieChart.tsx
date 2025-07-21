@@ -1,90 +1,127 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { PieChart as PieChartIcon } from 'lucide-react';
 
-interface ExpenseCategory {
-  nome: string;
-  valor: number;
-  cor: string;
-  percentage: number;
+interface ExpenseData {
+  categoria: string;
+  total: number;
 }
 
-interface ExpensesPieChartProps {
-  refreshTrigger?: number;
+interface ChartData {
+  name: string;
+  value: number;
+  color: string;
 }
 
-export const ExpensesPieChart = ({ refreshTrigger }: ExpensesPieChartProps) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: Array<{
+    payload: ChartData;
+  }>;
+}
+
+interface CustomLegendProps {
+  payload?: Array<{
+    value: string;
+    color: string;
+  }>;
+}
+
+export interface ExpensesPieChartProps {
+  familyId?: string | null;
+  selectedMonth?: string;
+}
+
+export const ExpensesPieChart = ({ familyId, selectedMonth = 'current' }: ExpensesPieChartProps) => {
   const { user } = useAuth();
-  const [data, setData] = useState<ExpenseCategory[]>([]);
+  const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
 
   useEffect(() => {
     if (user) {
-      loadExpensesByCategory();
+      loadExpensesData();
     }
-  }, [user, refreshTrigger]);
+  }, [user, familyId, selectedMonth]);
 
-  const loadExpensesByCategory = async () => {
+  const loadExpensesData = async () => {
     try {
       setLoading(true);
-      const currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM format
-      
-      const { data: transactions, error } = await supabase
+      let query = supabase
         .from('transactions')
         .select(`
           valor,
+          tipo,
+          data,
           categories:categoria_id (
             nome,
             cor
           )
         `)
-        .eq('user_id', user!.id)
-        .eq('tipo', 'despesa')
-        .gte('data', `${currentMonth}-01`)
-        .lt('data', `${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10)}`);
+        .eq('tipo', 'despesa');
+
+      // Filtrar por família ou pessoal
+      if (familyId) {
+        query = query.eq('family_id', familyId);
+      } else {
+        query = query.is('family_id', null);
+      }
+
+      const { data: transactions, error } = await query;
 
       if (error) throw error;
 
-      // Agrupar por categoria
-      const categoryMap = new Map<string, { nome: string; valor: number; cor: string }>();
-      let totalExpenses = 0;
+      // Filtrar por mês se necessário
+      let filteredTransactions = transactions || [];
+      
+      if (selectedMonth === 'current') {
+        const now = new Date();
+        filteredTransactions = transactions?.filter(t => {
+          const transactionDate = new Date(t.data);
+          return transactionDate.getMonth() === now.getMonth() &&
+                 transactionDate.getFullYear() === now.getFullYear();
+        }) || [];
+      } else if (selectedMonth !== 'all' && selectedMonth) {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        filteredTransactions = transactions?.filter(t => {
+          const transactionDate = new Date(t.data);
+          return transactionDate.getMonth() === (month - 1) &&
+                 transactionDate.getFullYear() === year;
+        }) || [];
+      }
 
-      transactions?.forEach(transaction => {
+      // Agrupar por categoria
+      const groupedData = filteredTransactions.reduce((acc: any, transaction) => {
         const categoryName = transaction.categories?.nome || 'Sem categoria';
         const categoryColor = transaction.categories?.cor || '#6B7280';
-        const valor = Number(transaction.valor);
         
-        totalExpenses += valor;
-        
-        if (categoryMap.has(categoryName)) {
-          const existing = categoryMap.get(categoryName)!;
-          existing.valor += valor;
-        } else {
-          categoryMap.set(categoryName, {
-            nome: categoryName,
-            valor,
-            cor: categoryColor
-          });
+        if (!acc[categoryName]) {
+          acc[categoryName] = {
+            name: categoryName,
+            value: 0,
+            fill: categoryColor
+          };
         }
-      });
+        
+        acc[categoryName].value += transaction.valor;
+        return acc;
+      }, {});
 
-      // Converter para array e calcular percentagens
-      const categoryData: ExpenseCategory[] = Array.from(categoryMap.values())
-        .map(category => ({
-          ...category,
-          percentage: totalExpenses > 0 ? (category.valor / totalExpenses) * 100 : 0
-        }))
-        .sort((a, b) => b.valor - a.valor)
-        .slice(0, 6); // Top 6 categorias
-
-      setData(categoryData);
+      const chartData: ChartData[] = Object.values(groupedData).map((item: any) => ({
+        name: item.name,
+        value: item.value,
+        color: item.fill
+      }));
+      
+      const totalExpenses = chartData.reduce((sum, item) => sum + item.value, 0);
+      
+      setData(chartData);
       setTotal(totalExpenses);
     } catch (error) {
-      console.error('Erro ao carregar despesas por categoria:', error);
+      console.error('Erro ao carregar dados de despesas:', error);
     } finally {
       setLoading(false);
     }
@@ -97,14 +134,14 @@ export const ExpensesPieChart = ({ refreshTrigger }: ExpensesPieChartProps) => {
     }).format(value);
   };
 
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: CustomTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
         <div className="bg-card border rounded-lg p-3 shadow-lg">
-          <p className="font-medium">{data.nome}</p>
+          <p className="font-medium">{data.name}</p>
           <p className="text-sm text-muted-foreground">
-            {formatCurrency(data.valor)} ({data.percentage.toFixed(1)}%)
+            {formatCurrency(data.value)} ({(data.value / total * 100).toFixed(1)}%)
           </p>
         </div>
       );
@@ -112,10 +149,10 @@ export const ExpensesPieChart = ({ refreshTrigger }: ExpensesPieChartProps) => {
     return null;
   };
 
-  const CustomLegend = ({ payload }: any) => {
+  const CustomLegend = ({ payload }: CustomLegendProps) => {
     return (
       <div className="flex flex-wrap gap-2 justify-center mt-4">
-        {payload?.map((entry: any, index: number) => (
+        {payload?.map((entry, index) => (
           <div key={index} className="flex items-center gap-1 text-xs">
             <div 
               className="w-3 h-3 rounded-full"
@@ -190,10 +227,10 @@ export const ExpensesPieChart = ({ refreshTrigger }: ExpensesPieChartProps) => {
                 innerRadius={60}
                 outerRadius={100}
                 paddingAngle={2}
-                dataKey="valor"
+                dataKey="value"
               >
                 {data.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.cor} />
+                  <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
               <Tooltip content={<CustomTooltip />} />
@@ -209,14 +246,14 @@ export const ExpensesPieChart = ({ refreshTrigger }: ExpensesPieChartProps) => {
               <div className="flex items-center gap-2">
                 <div 
                   className="w-3 h-3 rounded-full"
-                  style={{ backgroundColor: category.cor }}
+                  style={{ backgroundColor: category.color }}
                 />
-                <span>{category.nome}</span>
+                <span>{category.name}</span>
               </div>
               <div className="text-right">
-                <span className="font-medium">{formatCurrency(category.valor)}</span>
+                <span className="font-medium">{formatCurrency(category.value)}</span>
                 <span className="text-muted-foreground ml-1">
-                  ({category.percentage.toFixed(1)}%)
+                  ({(category.value / total * 100).toFixed(1)}%)
                 </span>
               </div>
             </div>

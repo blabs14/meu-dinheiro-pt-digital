@@ -21,47 +21,95 @@ interface Transaction {
   } | null;
 }
 
-interface RecentTransactionsProps {
-  refreshTrigger?: number;
+export interface RecentTransactionsProps {
+  familyId?: string;
 }
 
-export const RecentTransactions = ({ refreshTrigger }: RecentTransactionsProps) => {
+export const RecentTransactions = ({ familyId }: RecentTransactionsProps) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (user) {
+      console.log('🔍 [RecentTransactions] useEffect triggered - loading transactions');
       loadRecentTransactions();
+    } else {
+      console.log('⚠️ [RecentTransactions] No user found');
     }
-  }, [user, refreshTrigger]);
+  }, [user, familyId]);
 
   const loadRecentTransactions = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
+      console.log('🔍 [RecentTransactions] Iniciando carregamento de transações');
+      console.log('🔍 [RecentTransactions] User ID:', user?.id);
+      console.log('🔍 [RecentTransactions] Family ID:', familyId);
+
+      // Primeiro, verificar se conseguimos aceder à tabela
+      const { count, error: countError } = await supabase
         .from('transactions')
-        .select(`
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', user!.id);
+
+      console.log('🔍 [RecentTransactions] Total de transações do utilizador:', count);
+      console.log('🔍 [RecentTransactions] Erro ao contar:', countError);
+
+      let query = supabase.from('transactions').select(`
           id,
           valor,
           data,
           tipo,
           descricao,
           modo,
+          family_id,
+          user_id,
+          created_at,
           categories:categoria_id (
             nome,
             cor
           )
         `)
         .eq('user_id', user!.id)
-        .order('data', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(10);
+        .order('data', { ascending: false });
 
-      if (error) throw error;
+      // Se familyId for fornecido, mostrar apenas transações dessa família
+      if (familyId) {
+        console.log('🔍 [RecentTransactions] Filtrando por família:', familyId);
+        query = query.eq('family_id', familyId);
+      } else {
+        // Se não for fornecido, mostrar apenas transações pessoais (family_id IS NULL)
+        console.log('🔍 [RecentTransactions] Filtrando transações pessoais (family_id IS NULL)');
+        query = query.is('family_id', null);
+      }
+
+      console.log('🔍 [RecentTransactions] Executando query...');
+
+      const { data, error } = await query.limit(10);
+
+      console.log('🔍 [RecentTransactions] Resultado da query:', data);
+      console.log('🔍 [RecentTransactions] Erro da query:', error);
+      console.log('🔍 [RecentTransactions] Número de transações retornadas:', data?.length || 0);
+
+      if (error) {
+        console.error('❌ [RecentTransactions] Erro detalhado:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error;
+      }
+      
+      console.log('✅ [RecentTransactions] Transações carregadas:', data?.length || 0);
+      if (data && data.length > 0) {
+        console.log('🔍 [RecentTransactions] Primeira transação:', data[0]);
+      }
+      
       setTransactions(data || []);
     } catch (error) {
-      console.error('Erro ao carregar transações:', error);
+      console.error('❌ [RecentTransactions] Erro ao carregar transações:', error);
+      setTransactions([]);
     } finally {
       setLoading(false);
     }
@@ -112,10 +160,13 @@ export const RecentTransactions = ({ refreshTrigger }: RecentTransactionsProps) 
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Calendar className="h-5 w-5" />
-          Transações Recentes
+          {familyId ? 'Transações da Família' : 'Transações Recentes'}
         </CardTitle>
         <CardDescription>
-          Últimas {transactions.length} movimentações
+          {familyId 
+            ? 'Movimentações partilhadas com a família'
+            : `Últimas ${transactions.length} movimentações`
+          }
         </CardDescription>
       </CardHeader>
       <CardContent>

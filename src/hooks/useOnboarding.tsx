@@ -22,15 +22,22 @@ export const useOnboarding = () => {
     try {
       setLoading(true);
 
-      // Verificar se o perfil existe
+      // Verificar se o perfil existe com melhor tratamento de erros
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('id, nome')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle em vez de single para evitar erros
+
+      // Se há erro de RLS ou outro problema, assumir que precisa de onboarding
+      if (profileError) {
+        console.error('Erro ao verificar perfil:', profileError);
+        setNeedsOnboarding(true);
+        return;
+      }
 
       // Se não tem perfil ou perfil está incompleto, precisa de onboarding
-      if (profileError || !profile || !profile.nome) {
+      if (!profile || !profile.nome) {
         setNeedsOnboarding(true);
         return;
       }
@@ -52,6 +59,13 @@ export const useOnboarding = () => {
           .limit(1)
       ]);
 
+      // Se há erros nas consultas, assumir que não precisa de onboarding
+      if (transError || goalsError) {
+        console.error('Erro ao verificar atividade:', { transError, goalsError });
+        setNeedsOnboarding(false);
+        return;
+      }
+
       // Se não tem transações nem metas, ainda precisa de setup
       const hasActivity = (transactions && transactions.length > 0) || (goals && goals.length > 0);
       
@@ -59,7 +73,7 @@ export const useOnboarding = () => {
 
     } catch (error) {
       console.error('Erro ao verificar status de onboarding:', error);
-      // Em caso de erro, assumir que não precisa de onboarding
+      // Em caso de erro, assumir que não precisa de onboarding para evitar loops
       setNeedsOnboarding(false);
     } finally {
       setLoading(false);

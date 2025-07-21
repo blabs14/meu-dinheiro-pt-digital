@@ -91,6 +91,7 @@ export const FamilyDashboard = () => {
           
           // Carregar dados adicionais
           await loadFamilyMembers(family.id);
+          await loadFamilyStats(family.id); // Carregar estatísticas
         } else {
           console.warn('⚠️ FamilyDashboard - Estrutura de dados inválida:', familyResponse);
           setCurrentFamily(null);
@@ -129,6 +130,74 @@ export const FamilyDashboard = () => {
       }
     } catch (error) {
       console.error('❌ Erro ao carregar membros:', error);
+    }
+  };
+
+  const loadFamilyStats = async (familyId: string) => {
+    try {
+      console.log('🔍 [FamilyDashboard] Carregando estatísticas para família:', familyId);
+      
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      
+      // Carregar transações da família do mês atual
+      const { data: transactions, error: transactionsError } = await supabase
+        .from('transactions')
+        .select('valor, tipo')
+        .eq('family_id', familyId)
+        .gte('data', `${currentMonth}-01`)
+        .lt('data', `${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10)}`);
+
+      if (transactionsError) {
+        console.error('❌ [FamilyDashboard] Erro ao carregar transações:', transactionsError);
+        throw transactionsError;
+      }
+
+      // Calcular totais
+      const income = transactions
+        ?.filter(t => t.tipo === 'receita')
+        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+        
+      const expenses = transactions
+        ?.filter(t => t.tipo === 'despesa')
+        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+
+      // Calcular taxa de poupança
+      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+
+      // Carregar número de metas da família
+      const { data: goals, error: goalsError } = await supabase
+        .from('goals')
+        .select('id')
+        .eq('family_id', familyId);
+
+      if (goalsError) {
+        console.error('❌ [FamilyDashboard] Erro ao carregar metas:', goalsError);
+      }
+
+      const newStats = {
+        totalIncome: income,
+        totalExpenses: expenses,
+        savingsRate,
+        activeGoals: goals?.length || 0
+      };
+
+      setStats(prev => ({
+        ...prev,
+        ...newStats
+      }));
+
+      console.log('🔍 [FamilyDashboard] Estatísticas atualizadas:', newStats);
+
+    } catch (error) {
+      console.error('❌ [FamilyDashboard] Erro ao carregar estatísticas da família:', error);
+      // Definir valores padrão em caso de erro
+      setStats(prev => ({
+        ...prev,
+        totalIncome: 0,
+        totalExpenses: 0,
+        savingsRate: 0,
+        activeGoals: 0
+      }));
     }
   };
 

@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 
 interface BeforeInstallPromptEvent extends Event {
-  prompt(): Promise<void>;
+  prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
 }
 
 export const usePWA = () => {
   const [isInstallable, setIsInstallable] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [swRegistration, setSwRegistration] = useState<ServiceWorkerRegistration | null>(null);
 
@@ -60,7 +60,7 @@ export const usePWA = () => {
     // Listener para evento de instalação
     const handleBeforeInstallPrompt = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
       setIsInstallable(true);
     };
 
@@ -68,7 +68,7 @@ export const usePWA = () => {
     const handleAppInstalled = () => {
       setIsInstalled(true);
       setIsInstallable(false);
-      setInstallPrompt(null);
+      setDeferredPrompt(null);
               // App foi instalada com sucesso
     };
 
@@ -92,15 +92,15 @@ export const usePWA = () => {
   }, []);
 
   const installApp = async () => {
-    if (!installPrompt) return false;
+    if (!deferredPrompt) return false;
 
     try {
-      await installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
+      await deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
       
       if (outcome === 'accepted') {
         setIsInstallable(false);
-        setInstallPrompt(null);
+        setDeferredPrompt(null);
         return true;
       }
       

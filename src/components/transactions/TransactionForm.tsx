@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { CalendarIcon, TrendingUp, TrendingDown } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 interface Category {
   id: string;
@@ -35,41 +36,69 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [date, setDate] = useState<Date>(new Date());
+  const [isFamily, setIsFamily] = useState(false);
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyIdLoading, setFamilyIdLoading] = useState(false);
+  const [familyIdError, setFamilyIdError] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState({
+  const form = {
     tipo: defaultType,
     valor: '',
     categoria_id: '',
     descricao: '',
-    modo: 'pessoal'
-  });
+    modo: 'pessoal',
+    data: new Date()
+  };
 
   useEffect(() => {
     if (open) {
       loadCategories();
-      setFormData(prev => ({ ...prev, tipo: defaultType }));
+      setFormData({
+        tipo: defaultType,
+        valor: '',
+        categoria_id: '',
+        descricao: '',
+        modo: 'pessoal',
+        data: new Date()
+      });
     }
   }, [open, defaultType]);
 
-  const loadCategories = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('categories')
-        .select('*')
-        .order('nome');
+  useEffect(() => {
+    const fetchFamily = async () => {
+      setFamilyIdLoading(true);
+      setFamilyIdError(null);
+      if (user) {
+        const { data } = await supabase.rpc('get_user_family_data', { p_user_id: user.id });
+        console.log('🔍 [TransactionForm] get_user_family_data:', data);
+        if (data && Array.isArray(data) && (data[0] as any)?.family?.id) {
+          setFamilyId((data[0] as any).family.id);
+        } else {
+          setFamilyId(null);
+          setFamilyIdError('Não foi possível obter o ID da família.');
+        }
+      }
+      setFamilyIdLoading(false);
+    };
+    fetchFamily();
+  }, [user]);
 
-      if (error) throw error;
-      setCategories(data || []);
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar categorias",
-        variant: "destructive"
-      });
+  const loadCategories = useCallback(async () => {
+    const { data } = await supabase
+      .from('categories')
+      .select('*')
+      .order('nome');
+    
+    if (data) {
+      setCategories(data);
     }
-  };
+  }, []);
 
-  const filteredCategories = categories.filter(cat => cat.tipo === formData.tipo);
+  useEffect(() => {
+    loadCategories();
+  }, [loadCategories]);
+
+  const filteredCategories = categories.filter(cat => cat.tipo === form.tipo);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,26 +106,62 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
 
     setLoading(true);
     try {
-      const { error } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          tipo: formData.tipo,
-          valor: parseFloat(formData.valor),
-          data: format(date, 'yyyy-MM-dd'),
-          categoria_id: formData.categoria_id || null,
-          descricao: formData.descricao || null,
-          modo: formData.modo
-        });
+      console.log('🔍 [TransactionForm] Iniciando criação de transação');
+      console.log('🔍 [TransactionForm] Dados do formulário:', formData);
+      console.log('🔍 [TransactionForm] User ID:', user.id);
+      console.log('🔍 [TransactionForm] Is Family:', isFamily);
 
-      if (error) throw error;
+      // Buscar family_id se for transação familiar
+      let familyId = null;
+      if (isFamily) {
+        console.log('🔍 [TransactionForm] Buscando family_id para transação familiar');
+        const { data: familyData, error: familyError } = await supabase
+          .rpc('get_user_family_data', { p_user_id: user.id });
+        
+        console.log('🔍 [TransactionForm] Resultado da busca de família:', familyData);
+        console.log('🔍 [TransactionForm] Erro na busca de família:', familyError);
+        
+        if (familyData && Array.isArray(familyData) && familyData[0]?.family?.id) {
+          familyId = familyData[0].family.id;
+          console.log('✅ [TransactionForm] Family ID encontrado:', familyId);
+        } else {
+          console.log('❌ [TransactionForm] Nenhum family ID encontrado');
+        }
+      } else {
+        console.log('✅ [TransactionForm] Transação pessoal - family_id será null');
+      }
+
+      const transactionData = {
+        user_id: user.id,
+        valor: parseFloat(formData.valor.replace(',', '.')),
+        tipo: formData.tipo,
+        categoria_id: formData.categoria_id,
+        data: date.toISOString().split('T')[0],
+        descricao: formData.descricao,
+        modo: formData.modo,
+        family_id: familyId
+      };
+
+      console.log('🔍 [TransactionForm] Dados finais da transação:', transactionData);
+
+      const { data: insertData, error: insertError } = await supabase
+        .from('transactions')
+        .insert(transactionData)
+        .select();
+
+      console.log('🔍 [TransactionForm] Resultado da inserção:', insertData);
+      console.log('🔍 [TransactionForm] Erro na inserção:', insertError);
+
+      if (insertError) throw insertError;
+
+      console.log('✅ [TransactionForm] Transação criada com sucesso');
 
       toast({
-        title: "Sucesso",
+        title: "Sucesso!",
         description: `${formData.tipo === 'receita' ? 'Receita' : 'Despesa'} adicionada com sucesso`,
       });
 
-      // Reset form
+      // Reset form data
       setFormData({
         tipo: defaultType,
         valor: '',
@@ -105,13 +170,16 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
         modo: 'pessoal'
       });
       setDate(new Date());
-      onOpenChange(false);
+      setIsFamily(false);
+      
       onSuccess?.();
-
-    } catch (error: any) {
+      onOpenChange?.(false);
+    } catch (error) {
+      console.error('❌ [TransactionForm] Erro ao adicionar transação:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Erro ao adicionar transação';
       toast({
         title: "Erro",
-        description: error.message || "Erro ao guardar transação",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -123,6 +191,15 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
     const numericValue = value.replace(/[^\d,]/g, '').replace(',', '.');
     return numericValue;
   };
+
+  const [formData, setFormData] = useState({
+    tipo: defaultType,
+    valor: '',
+    categoria_id: '',
+    descricao: '',
+    modo: 'pessoal',
+    data: new Date()
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -147,7 +224,7 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
             <Select
               value={formData.tipo}
               onValueChange={(value: 'receita' | 'despesa') => 
-                setFormData({ ...formData, tipo: value, categoria_id: '' })
+                setFormData(prev => ({ ...prev, tipo: value }))
               }
             >
               <SelectTrigger>
@@ -167,7 +244,7 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
               type="text"
               placeholder="0,00"
               value={formData.valor}
-              onChange={(e) => setFormData({ ...formData, valor: formatCurrency(e.target.value) })}
+              onChange={(e) => setFormData(prev => ({ ...prev, valor: formatCurrency(e.target.value) }))}
               required
             />
           </div>
@@ -202,7 +279,7 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
             <Label htmlFor="categoria">Categoria</Label>
             <Select
               value={formData.categoria_id}
-              onValueChange={(value) => setFormData({ ...formData, categoria_id: value })}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, categoria_id: value }))}
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecionar categoria" />
@@ -227,7 +304,7 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
             <Label htmlFor="modo">Modo</Label>
             <Select
               value={formData.modo}
-              onValueChange={(value) => setFormData({ ...formData, modo: value })}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, modo: value }))}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -245,18 +322,29 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
               id="descricao"
               placeholder="Adicione uma descrição..."
               value={formData.descricao}
-              onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, descricao: e.target.value }))}
               rows={3}
             />
+          </div>
+
+          <div className="flex items-center gap-2 mb-4">
+            <Switch id="is-family" checked={isFamily} onCheckedChange={setIsFamily} />
+            <label htmlFor="is-family" className="text-sm">Esta transação é da família?</label>
           </div>
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={loading || !formData.valor}>
+            <Button
+              type="submit"
+              disabled={loading || !formData.valor || (isFamily && (!familyId || familyIdLoading))}
+            >
               {loading ? 'A guardar...' : 'Guardar'}
             </Button>
+            {isFamily && familyIdError && (
+              <div className="text-red-600 text-xs mt-2">{familyIdError}</div>
+            )}
           </DialogFooter>
         </form>
       </DialogContent>
