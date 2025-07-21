@@ -15,7 +15,8 @@ import {
   RefreshCw,
   Check,
   X,
-  LogOut
+  LogOut,
+  Filter
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
@@ -87,6 +88,24 @@ export const FamilyDashboardVisualFixed = () => {
     memberCount: 0,
     activeGoals: 0
   });
+
+  const [selectedMonth, setSelectedMonth] = useState<string>('current');
+
+  // Gerar opções de meses
+  const getMonthOptions = () => {
+    const options = [
+      { value: 'current', label: 'Mês Atual' },
+      { value: 'all', label: 'Todos os Meses' }
+    ];
+    const now = new Date();
+    for (let i = 0; i < 12; i++) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      const label = date.toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+      options.push({ value, label });
+    }
+    return options;
+  };
 
   useEffect(() => {
     console.log('🔍 [FamilyDashboard] useEffect triggered:', { user: !!user, authLoading, loading });
@@ -251,27 +270,25 @@ export const FamilyDashboardVisualFixed = () => {
 
       if (goalsError) throw goalsError;
 
-      const currentMonth = new Date().getMonth();
-      const currentYear = new Date().getFullYear();
-
-      const totalIncome = transactions
-        ?.filter(t => {
+      let filteredTransactions = transactions || [];
+      if (selectedMonth === 'current') {
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        filteredTransactions = transactions?.filter(t => {
           const transactionDate = new Date(t.data);
-          return t.tipo === 'receita' && 
-                 transactionDate.getMonth() === currentMonth &&
-                 transactionDate.getFullYear() === currentYear;
-        })
-        ?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-
-      const totalExpenses = transactions
-        ?.filter(t => {
+          return transactionDate.getMonth() === currentMonth && transactionDate.getFullYear() === currentYear;
+        }) || [];
+      } else if (selectedMonth !== 'all') {
+        const [year, month] = selectedMonth.split('-').map(Number);
+        filteredTransactions = transactions?.filter(t => {
           const transactionDate = new Date(t.data);
-          return t.tipo === 'despesa' && 
-                 transactionDate.getMonth() === currentMonth &&
-                 transactionDate.getFullYear() === currentYear;
-        })
-        ?.reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+          return transactionDate.getMonth() === (month - 1) && transactionDate.getFullYear() === year;
+        }) || [];
+      }
 
+      const totalIncome = filteredTransactions.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
+      const totalExpenses = filteredTransactions.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + Number(t.valor), 0) || 0;
       const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
 
       setStats({
@@ -292,6 +309,12 @@ export const FamilyDashboardVisualFixed = () => {
       console.error('Erro ao carregar estatísticas:', error);
     }
   };
+
+  useEffect(() => {
+    if (currentFamily) {
+      loadFamilyStats(currentFamily.id);
+    }
+  }, [selectedMonth, currentFamily]);
 
   const loadUserPendingInvites = async () => {
     if (!user) return;
@@ -515,10 +538,24 @@ export const FamilyDashboardVisualFixed = () => {
                 </div>
               )}
               
-              <h1 className="text-3xl font-bold flex items-center gap-2">
-                <Users className="h-8 w-8 text-primary" />
-                {currentFamily.nome}
-              </h1>
+              <div className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl font-bold flex items-center gap-2">
+                  <Users className="h-8 w-8 text-primary" />
+                  {currentFamily.nome}
+                </h1>
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-muted-foreground" />
+                  <select
+                    value={selectedMonth}
+                    onChange={e => setSelectedMonth(e.target.value)}
+                    className="w-[200px] p-2 border rounded-md bg-background"
+                  >
+                    {getMonthOptions().map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
               <p className="text-muted-foreground mt-1">
                 Dashboard da família • {stats.memberCount} membros • Você é {getRoleLabel(userRole)}
               </p>
@@ -621,7 +658,7 @@ export const FamilyDashboardVisualFixed = () => {
                 <CardTitle className="flex items-center gap-2">Gráfico de Despesas</CardTitle>
               </CardHeader>
               <CardContent>
-                <ExpensesPieChart familyId={currentFamily.id} />
+                <ExpensesPieChart familyId={currentFamily.id} selectedMonth={selectedMonth} />
               </CardContent>
             </Card>
             <Card>
@@ -629,7 +666,7 @@ export const FamilyDashboardVisualFixed = () => {
                 <CardTitle className="flex items-center gap-2">Tendência Mensal</CardTitle>
               </CardHeader>
               <CardContent>
-                <MonthlyTrendChart familyId={currentFamily.id} />
+                <MonthlyTrendChart familyId={currentFamily.id} selectedMonth={selectedMonth} />
               </CardContent>
             </Card>
           </div>
@@ -639,7 +676,7 @@ export const FamilyDashboardVisualFixed = () => {
               <CardTitle className="flex items-center gap-2">Últimas Transações da Família</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions familyId={currentFamily.id} />
+              <RecentTransactions familyId={currentFamily.id} selectedMonth={selectedMonth} />
             </CardContent>
           </Card>
 

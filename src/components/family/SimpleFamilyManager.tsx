@@ -178,11 +178,8 @@ export const SimpleFamilyManager = () => {
     try {
       console.log('🔍 [SimpleFamilyManager] A carregar membros para família:', familyId);
       const { data: members, error } = await supabase
-        .from('family_members')
-        .select(`
-          *,
-          profiles (nome, email)
-        `)
+        .from('family_members_with_profile')
+        .select('*')
         .eq('family_id', familyId);
 
       console.log('🔍 [SimpleFamilyManager] Resultado da query membros:', { members, error });
@@ -758,64 +755,102 @@ export const SimpleFamilyManager = () => {
                 <div className="space-y-4">
                   {/* Lista de Membros */}
                   <div className="grid gap-3">
-                    {familyMembers.map((member) => (
-                      <div key={member.id} className="p-4 border rounded-lg">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium">{member.profile?.nome || 'Utilizador'}</p>
-                              <Badge variant={getRoleBadgeVariant(member.role)}>
-                                {getRoleDisplayName(member.role)}
-                              </Badge>
+                    {familyMembers.map((member) => {
+                      console.log('DEBUG membro:', JSON.stringify(member));
+                      return (
+                        <div key={member.id} className="p-4 border rounded-lg">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-medium">
+                                  {member.profile_nome || member.user_id || 'Utilizador'}
+                                </p>
+                                <Badge variant={getRoleBadgeVariant(member.role)}>
+                                  {getRoleDisplayName(member.role)}
+                                </Badge>
+                              </div>
+                              <p className="text-sm text-muted-foreground">
+                                {member.profile_email || ''}
+                              </p>
                             </div>
-                            <p className="text-sm text-muted-foreground">{member.profile?.email}</p>
+                            
+                            {isOwner && member.role !== 'owner' && (
+                              <div className="flex items-center gap-2 ml-4">
+                                <Select
+                                  value={member.role}
+                                  onValueChange={(newRole) => updateMemberRole(member.user_id, newRole, member.profile_nome || member.user_id)}
+                                >
+                                  <SelectTrigger className="w-36">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="admin">Administrador</SelectItem>
+                                    <SelectItem value="member">Membro</SelectItem>
+                                    <SelectItem value="viewer">Visualizador</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm">
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Remover membro</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tem a certeza que quer remover {member.profile_nome || member.user_id} da família? Esta ação não pode ser desfeita.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => removeMember(member.user_id, member.profile_nome || member.user_id)}
+                                        className="bg-red-600 hover:bg-red-700"
+                                      >
+                                        Remover
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                                {/* Botão Transferir Ownership */}
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <Button variant="outline" size="sm" className="text-orange-600 border-orange-400">
+                                      Transferir Ownership
+                                    </Button>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Transferir Ownership</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Tem a certeza que quer transferir o ownership para {member.profile_nome || member.user_id}?<br />
+                                        Vai perder os privilégios de owner nesta família.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        className="bg-orange-600 hover:bg-orange-700"
+                                        onClick={async () => {
+                                          await updateMemberRole(member.user_id, 'owner', member.profile_nome);
+                                          await updateMemberRole(user.id, 'admin', '');
+                                          toast({ title: 'Ownership transferido!', description: `Ownership transferido para ${member.profile_nome || member.user_id}` });
+                                          await loadFamily();
+                                        }}
+                                      >
+                                        Transferir
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              </div>
+                            )}
                           </div>
-                          
-                          {isOwner && member.role !== 'owner' && (
-                            <div className="flex items-center gap-2 ml-4">
-                              <Select
-                                value={member.role}
-                                onValueChange={(newRole) => updateMemberRole(member.user_id, newRole, member.profile?.nome)}
-                              >
-                                <SelectTrigger className="w-36">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="admin">Administrador</SelectItem>
-                                  <SelectItem value="member">Membro</SelectItem>
-                                  <SelectItem value="viewer">Visualizador</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <Button variant="outline" size="sm">
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Remover membro</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      Tem a certeza que quer remover {member.profile?.nome} da família? Esta ação não pode ser desfeita.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => removeMember(member.user_id, member.profile?.nome)}
-                                      className="bg-red-600 hover:bg-red-700"
-                                    >
-                                      Remover
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
-                            </div>
-                          )}
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                   
                   {/* Convites Pendentes */}
