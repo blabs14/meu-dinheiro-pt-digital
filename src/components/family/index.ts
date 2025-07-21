@@ -1,2 +1,4 @@
+export { FamilyDashboardVisual } from './FamilyDashboardVisual';
+export { SimpleFamilyManager } from './SimpleFamilyManager';
 export { FamilyManager } from './FamilyManager';
-export { FamilyDashboard } from './FamilyDashboard'; 
+export { FamilySelector } from './FamilySelector'; 

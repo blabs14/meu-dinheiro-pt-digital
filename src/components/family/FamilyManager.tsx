@@ -474,10 +474,41 @@ export const FamilyManager = () => {
     }
   };
 
-  const removeMember = async (memberId: string) => {
+  const removeMember = async (memberId: string, memberName?: string) => {
     if (!currentFamily) return;
 
     try {
+      // Verificar se o utilizador atual é owner ou admin
+      if (!['owner', 'admin'].includes(userRole)) {
+        toast({
+          title: "Permissão Negada",
+          description: "Apenas owners e admins podem remover membros",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Verificar se não está a tentar remover o próprio owner
+      const memberToRemove = familyMembers.find(m => m.id === memberId);
+      if (memberToRemove?.role === 'owner') {
+        toast({
+          title: "Operação Não Permitida",
+          description: "Não é possível remover o owner da família",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Verificar se não está a tentar remover a si próprio
+      if (memberToRemove?.user_id === user?.id) {
+        toast({
+          title: "Operação Não Permitida",
+          description: "Use 'Sair da Família' para se remover",
+          variant: "destructive"
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('family_members')
         .delete()
@@ -487,15 +518,16 @@ export const FamilyManager = () => {
 
       toast({
         title: "Membro Removido",
-        description: "O membro foi removido da família",
+        description: `${memberName || 'O membro'} foi removido da família com sucesso`,
       });
 
       await loadFamilyMembers(currentFamily.id);
 
     } catch (error: any) {
+      console.error('Erro ao remover membro:', error);
       toast({
         title: "Erro",
-        description: error.message || "Erro ao remover membro",
+        description: error.message || "Erro ao remover membro da família",
         variant: "destructive"
       });
     }
@@ -595,6 +627,26 @@ export const FamilyManager = () => {
     if (!currentFamily || !user) return;
 
     try {
+      // Verificar se é o owner e se há outros membros
+      if (userRole === 'owner') {
+        const otherMembers = familyMembers.filter(m => m.user_id !== user.id);
+        
+        if (otherMembers.length === 0) {
+          // Se é o único membro, eliminar a família
+          await deleteFamily();
+          return;
+        } else {
+          // Se há outros membros, mostrar aviso
+          toast({
+            title: "Aviso",
+            description: "Como owner, deve transferir o ownership antes de sair ou eliminar a família",
+            variant: "destructive"
+          });
+          return;
+        }
+      }
+
+      // Para outros roles, permitir sair
       const { error } = await supabase
         .from('family_members')
         .delete()
@@ -605,7 +657,7 @@ export const FamilyManager = () => {
 
       toast({
         title: "Saiu da Família",
-        description: "Saiu da família com sucesso",
+        description: `Saiu da família "${currentFamily.nome}" com sucesso`,
       });
 
       // Limpar estado
@@ -615,9 +667,60 @@ export const FamilyManager = () => {
       setUserRole('viewer');
 
     } catch (error: any) {
+      console.error('Erro ao sair da família:', error);
       toast({
         title: "Erro",
-        description: error.message,
+        description: error.message || "Erro ao sair da família",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const transferOwnership = async (memberId: string, memberName?: string) => {
+    if (!currentFamily || userRole !== 'owner') return;
+
+    try {
+      // Verificar se o membro existe
+      const memberToTransfer = familyMembers.find(m => m.id === memberId);
+      if (!memberToTransfer) {
+        toast({
+          title: "Erro",
+          description: "Membro não encontrado",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Atualizar o role do novo owner
+      const { error: updateError } = await supabase
+        .from('family_members')
+        .update({ role: 'owner' })
+        .eq('id', memberId);
+
+      if (updateError) throw updateError;
+
+      // Atualizar o role do owner atual para admin
+      const { error: demoteError } = await supabase
+        .from('family_members')
+        .update({ role: 'admin' })
+        .eq('user_id', user?.id)
+        .eq('family_id', currentFamily.id);
+
+      if (demoteError) throw demoteError;
+
+      toast({
+        title: "Ownership Transferido",
+        description: `${memberName || 'O membro'} é agora o owner da família`,
+      });
+
+      await loadFamilyData();
+      await loadFamilyMembers(currentFamily.id);
+
+    } catch (error: any) {
+      console.error('Erro ao transferir ownership:', error);
+      toast({
+        title: "Erro",
+        description: error.message || "Erro ao transferir ownership da família",
         variant: "destructive"
       });
     }
@@ -743,6 +846,42 @@ export const FamilyManager = () => {
 
             <TabsContent value="members">
               <div className="space-y-6">
+                {/* Estatísticas dos Membros */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Estatísticas dos Membros
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-primary">{familyMembers.length}</div>
+                        <div className="text-sm text-muted-foreground">Total de Membros</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-600">
+                          {familyMembers.filter(m => m.role === 'owner').length}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Owner</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-600">
+                          {familyMembers.filter(m => m.role === 'admin').length}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Admins</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-orange-600">
+                          {familyMembers.filter(m => ['member', 'viewer'].includes(m.role)).length}
+                        </div>
+                        <div className="text-sm text-muted-foreground">Membros</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 {/* Convitar novo membro */}
                 {canInviteMembers && (
                   <Card>
@@ -799,7 +938,7 @@ export const FamilyManager = () => {
                   <CardContent>
                     <div className="space-y-4">
                       {familyMembers.map((member) => (
-                        <div key={member.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
                           <div className="flex items-center space-x-3">
                             <Avatar>
                               <AvatarFallback>
@@ -813,7 +952,13 @@ export const FamilyManager = () => {
                                 <span className="text-sm text-muted-foreground">
                                   {getRoleLabel(member.role)}
                                 </span>
+                                {member.user_id === user?.id && (
+                                  <Badge variant="outline" className="text-xs">Você</Badge>
+                                )}
                               </div>
+                              <p className="text-xs text-muted-foreground">
+                                Membro desde {format(new Date(member.joined_at), 'dd/MM/yyyy', { locale: pt })}
+                              </p>
                             </div>
                           </div>
                           
@@ -823,7 +968,7 @@ export const FamilyManager = () => {
                               <select
                                 value={member.role}
                                 onChange={(e) => updateMemberRole(member.id, e.target.value as 'admin' | 'member' | 'viewer')}
-                                className="text-xs px-2 py-1 border rounded"
+                                className="text-xs px-2 py-1 border rounded bg-background"
                               >
                                 <option value="admin">Admin</option>
                                 <option value="member">Membro</option>
@@ -833,29 +978,113 @@ export const FamilyManager = () => {
                               {/* Botão remover */}
                               <AlertDialog>
                                 <AlertDialogTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">
+                                    <Trash2 className="h-4 w-4" />
                                   </Button>
                                 </AlertDialogTrigger>
                                 <AlertDialogContent>
                                   <AlertDialogHeader>
                                     <AlertDialogTitle>Remover Membro</AlertDialogTitle>
                                     <AlertDialogDescription>
-                                      Tem a certeza que quer remover este membro da família?
+                                      Tem a certeza que quer remover <strong>{member.profiles?.nome || 'este membro'}</strong> da família?
+                                      <br />
+                                      <br />
+                                      <span className="text-sm text-muted-foreground">
+                                        Esta ação não pode ser desfeita. O membro perderá acesso a todas as transações e dados da família.
+                                      </span>
                                     </AlertDialogDescription>
                                   </AlertDialogHeader>
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction
-                                      onClick={() => removeMember(member.id)}
-                                      className="bg-destructive text-destructive-foreground"
+                                      onClick={() => removeMember(member.id, member.profiles?.nome)}
+                                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
-                                      Remover
+                                      Remover Membro
                                     </AlertDialogAction>
                                   </AlertDialogFooter>
                                 </AlertDialogContent>
                               </AlertDialog>
                             </div>
+                          )}
+                          
+                          {/* Botão para transferir ownership (apenas para owner) */}
+                          {userRole === 'owner' && member.role !== 'owner' && member.user_id !== user?.id && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="ghost" size="sm" className="text-blue-600 hover:text-blue-700">
+                                  <Crown className="h-4 w-4" />
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Transferir Ownership</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem a certeza que quer transferir o ownership da família para <strong>{member.profiles?.nome || 'este membro'}</strong>?
+                                    <br />
+                                    <br />
+                                    <span className="text-sm text-muted-foreground">
+                                      Você passará a ser admin e {member.profiles?.nome || 'este membro'} será o novo owner da família.
+                                    </span>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => transferOwnership(member.id, member.profiles?.nome)}
+                                    className="bg-blue-600 text-white hover:bg-blue-700"
+                                  >
+                                    Transferir Ownership
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                          
+                          {/* Mostrar informação se não pode ser removido */}
+                          {(!canManageMembers || member.role === 'owner' || member.user_id === user?.id) && (
+                            <div className="text-xs text-muted-foreground">
+                              {member.role === 'owner' && 'Owner da família'}
+                              {member.user_id === user?.id && 'Você mesmo'}
+                              {!canManageMembers && 'Sem permissão'}
+                            </div>
+                          )}
+                          
+                          {/* Botão Sair da Família para o próprio utilizador */}
+                          {member.user_id === user?.id && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button variant="outline" size="sm" className="text-orange-600 border-orange-200 hover:bg-orange-50">
+                                  <Users className="h-4 w-4 mr-1" />
+                                  Sair
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Sair da Família</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    Tem a certeza que quer sair da família <strong>"{currentFamily?.nome}"</strong>?
+                                    <br />
+                                    <br />
+                                    <span className="text-sm text-muted-foreground">
+                                      {userRole === 'owner' 
+                                        ? "Como owner, deve transferir o ownership antes de sair ou eliminar a família completamente."
+                                        : "Perderá acesso a todas as transações e dados da família."
+                                      }
+                                    </span>
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={leaveFamily}
+                                    className="bg-orange-600 text-white hover:bg-orange-700"
+                                  >
+                                    Sair da Família
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
                           )}
                         </div>
                       ))}
@@ -992,39 +1221,84 @@ export const FamilyManager = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {userRole !== 'owner' && (
-                      <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
+                    {/* Sair da Família - Para todos os roles */}
+                    <div className="flex items-center justify-between p-4 border border-orange-200 rounded-lg bg-orange-50">
+                      <div>
+                        <h4 className="font-medium text-orange-800">Sair da Família</h4>
+                        <p className="text-sm text-orange-600">
+                          {userRole === 'owner' 
+                            ? "Remover-se da família (deve transferir ownership primeiro)"
+                            : "Remover-se como membro desta família"
+                          }
+                        </p>
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button variant="outline" className="border-orange-300 text-orange-700">
+                            Sair da Família
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Sair da Família?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {userRole === 'owner' 
+                                ? `Como owner da família "${currentFamily.nome}", deve transferir o ownership antes de sair ou eliminar a família completamente.`
+                                : `Tem a certeza que quer sair da família "${currentFamily.nome}"? Perderá acesso a todas as transações e dados familiares.`
+                              }
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                            <AlertDialogAction 
+                              onClick={leaveFamily} 
+                              className="bg-orange-600 hover:bg-orange-700"
+                              disabled={userRole === 'owner'}
+                            >
+                              Sair da Família
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+
+                    {/* Transferir Ownership - Apenas para owner */}
+                    {userRole === 'owner' && (
+                      <div className="flex items-center justify-between p-4 border border-blue-200 rounded-lg bg-blue-50">
                         <div>
-                          <h4 className="font-medium text-orange-800">Sair da Família</h4>
-                          <p className="text-sm text-orange-600">
-                            Remover-se como membro desta família
+                          <h4 className="font-medium text-blue-800">Transferir Ownership</h4>
+                          <p className="text-sm text-blue-600">
+                            Transferir a posse da família para outro membro
                           </p>
                         </div>
-                        <AlertDialog>
-                          <AlertDialogTrigger asChild>
-                            <Button variant="outline" className="border-orange-300 text-orange-700">
-                              Sair da Família
-                            </Button>
-                          </AlertDialogTrigger>
-                          <AlertDialogContent>
-                            <AlertDialogHeader>
-                              <AlertDialogTitle>Sair da Família?</AlertDialogTitle>
-                              <AlertDialogDescription>
-                                Tem a certeza que quer sair da família "{currentFamily.nome}"? 
-                                Perderá acesso a todas as transações e dados familiares.
-                              </AlertDialogDescription>
-                            </AlertDialogHeader>
-                            <AlertDialogFooter>
-                              <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                              <AlertDialogAction onClick={leaveFamily} className="bg-orange-600">
-                                Sair da Família
-                              </AlertDialogAction>
-                            </AlertDialogFooter>
-                          </AlertDialogContent>
-                        </AlertDialog>
+                        <Button 
+                          variant="outline" 
+                          className="border-blue-300 text-blue-700"
+                          onClick={() => {
+                            // Mostrar lista de membros para transferir ownership
+                            const otherMembers = familyMembers.filter(m => m.user_id !== user?.id);
+                            if (otherMembers.length === 0) {
+                              toast({
+                                title: "Sem Membros",
+                                description: "Não há outros membros para transferir o ownership",
+                                variant: "destructive"
+                              });
+                            } else {
+                              // Aqui poderia abrir um modal para selecionar o membro
+                              toast({
+                                title: "Transferir Ownership",
+                                description: "Use o botão de coroa na lista de membros para transferir ownership",
+                              });
+                            }
+                          }}
+                        >
+                          <Crown className="h-4 w-4 mr-2" />
+                          Transferir Ownership
+                        </Button>
                       </div>
                     )}
 
+                    {/* Eliminar Família - Apenas para owner */}
                     {userRole === 'owner' && (
                       <div className="flex items-center justify-between p-4 border border-destructive rounded-lg bg-destructive/5">
                         <div>

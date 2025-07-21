@@ -1,7 +1,5 @@
-import { FamilyDashboardVisual } from '@/components/family/FamilyDashboardVisual';
+import { FamilyDashboardVisualFixed } from '@/components/family/FamilyDashboardVisualFixed';
 
-const Family = () => {
-  return <FamilyDashboardVisual />;
-};
-
-export default Family; 
+export default function Family() {
+  return <FamilyDashboardVisualFixed />;
+} 

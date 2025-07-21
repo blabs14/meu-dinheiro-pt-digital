@@ -14,7 +14,8 @@ import {
   Settings,
   RefreshCw,
   Check,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
@@ -62,7 +63,7 @@ interface FamilyInvite {
   expires_at: string;
 }
 
-export const FamilyDashboardVisual = () => {
+export const FamilyDashboardVisualFixed = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -73,6 +74,11 @@ export const FamilyDashboardVisual = () => {
   const [userRole, setUserRole] = useState<string>('member');
   const [pendingInvites, setPendingInvites] = useState<FamilyInvite[]>([]);
   const [invitesLoading, setInvitesLoading] = useState(false);
+  
+  // Novos estados para múltiplas famílias
+  const [userFamilies, setUserFamilies] = useState<FamilyData[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
+  const [familiesLoading, setFamiliesLoading] = useState(false);
   
   const [stats, setStats] = useState({
     totalIncome: 0,
@@ -86,55 +92,165 @@ export const FamilyDashboardVisual = () => {
     console.log('🔍 [FamilyDashboard] useEffect triggered:', { user: !!user, authLoading, loading });
     if (user && !authLoading) {
       console.log('🔍 [FamilyDashboard] Carregando dados da família');
-      loadFamilyData();
+      loadUserFamilies();
     } else if (!user && !authLoading) {
       console.log('🔍 [FamilyDashboard] Utilizador não autenticado, parando loading');
       setLoading(false);
     }
   }, [user, authLoading]);
 
-  // Debug: Log stats changes
-  useEffect(() => {
-    console.log('🔍 [FamilyDashboardVisual] Estado atual das estatísticas:', stats);
-  }, [stats]);
-
-  const loadAllData = async () => {
+  // Carregar todas as famílias do utilizador
+  const loadUserFamilies = async () => {
+    if (!user) {
+      setLoading(false);
+      return;
+    }
+    
+    setFamiliesLoading(true);
     setLoading(true);
-    await Promise.all([
-      loadFamilyData(),
-      loadUserPendingInvites()
-    ]);
-    setLoading(false);
+    console.log('🔍 [FamilyDashboard] Carregando todas as famílias do utilizador:', user.id);
+    
+    try {
+      const { data: familyMembers, error: memberError } = await supabase
+        .from('family_members')
+        .select(`
+          family_id,
+          role,
+          families (*)
+        `)
+        .eq('user_id', user.id);
+
+      console.log('🔍 [FamilyDashboard] Resultado da query:', { familyMembers, memberError });
+
+      if (memberError) {
+        console.error('Erro ao carregar famílias:', memberError);
+        setLoading(false);
+        return;
+      }
+
+      if (familyMembers && familyMembers.length > 0) {
+        const familiesData = familyMembers.map(fm => ({
+          ...fm.families,
+          userRole: fm.role,
+          settings: fm.families.settings as {
+            allow_view_all: boolean;
+            allow_add_transactions: boolean;
+            require_approval: boolean;
+          }
+        })) as FamilyData[];
+        
+        setUserFamilies(familiesData);
+        
+        // Selecionar a primeira família por padrão
+        if (!selectedFamilyId && familiesData.length > 0) {
+          setSelectedFamilyId(familiesData[0].id);
+          setCurrentFamily(familiesData[0]);
+          setUserRole(familiesData[0].userRole || 'member');
+        }
+        
+        console.log('🔍 [FamilyDashboard] Famílias carregadas:', familiesData);
+      } else {
+        console.log('🔍 [FamilyDashboard] Utilizador não pertence a nenhuma família');
+        setUserFamilies([]);
+        setCurrentFamily(null);
+        setUserRole('member');
+        setFamilyMembers([]);
+        setStats({
+          totalIncome: 0,
+          totalExpenses: 0,
+          savingsRate: 0,
+          memberCount: 0,
+          activeGoals: 0
+        });
+      }
+      
+      console.log('🔍 [FamilyDashboard] Processamento concluído');
+    } catch (error) {
+      console.error('Erro ao carregar famílias:', error);
+    } finally {
+      setFamiliesLoading(false);
+      setLoading(false);
+    }
+  };
+
+  // Carregar dados da família selecionada
+  useEffect(() => {
+    if (selectedFamilyId && user) {
+      loadFamilyData();
+    }
+  }, [selectedFamilyId, user]);
+
+  const loadFamilyData = async () => {
+    if (!user || !selectedFamilyId) return;
+    
+    console.log('🔍 [FamilyDashboard] Carregando dados da família selecionada:', selectedFamilyId);
+    
+    try {
+      // Encontrar a família selecionada
+      const selectedFamily = userFamilies.find(f => f.id === selectedFamilyId);
+      if (!selectedFamily) {
+        console.error('Família selecionada não encontrada');
+        return;
+      }
+
+      setCurrentFamily(selectedFamily);
+      setUserRole(selectedFamily.userRole || 'member');
+      
+      // Carregar membros da família
+      await loadFamilyMembers(selectedFamilyId);
+      
+      // Carregar estatísticas
+      await loadFamilyStats(selectedFamilyId);
+      
+      // Carregar convites pendentes
+      await loadUserPendingInvites();
+      
+      console.log('🔍 [FamilyDashboard] Dados da família carregados:', selectedFamily);
+    } catch (error) {
+      console.error('Erro ao carregar dados da família:', error);
+    }
+  };
+
+  const loadFamilyMembers = async (familyId: string) => {
+    try {
+      const { data: members, error } = await supabase
+        .from('family_members')
+        .select(`
+          *,
+          profiles (nome, email)
+        `)
+        .eq('family_id', familyId);
+
+      if (error) {
+        console.error('Erro ao carregar membros:', error);
+        return;
+      }
+
+      setFamilyMembers(members as FamilyMember[] || []);
+      setStats(prev => ({ ...prev, memberCount: members?.length || 0 }));
+    } catch (error) {
+      console.error('Erro ao carregar membros:', error);
+    }
   };
 
   const loadFamilyStats = async (familyId: string) => {
     try {
       console.log('🔍 [FamilyDashboard] Carregando estatísticas da família:', familyId);
       
-      // Carregar transações da família
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
         .select('*')
         .eq('family_id', familyId);
 
-      console.log('🔍 [FamilyDashboard] Transações da família:', transactions);
-      console.log('🔍 [FamilyDashboard] Erro transações:', transactionsError);
-
       if (transactionsError) throw transactionsError;
 
-      // Carregar metas da família
       const { data: goals, error: goalsError } = await supabase
         .from('goals')
         .select('*')
         .eq('family_id', familyId);
-        // .eq('status', 'active'); // Temporariamente comentado até adicionar a coluna
-
-      console.log('🔍 [FamilyDashboard] Metas da família:', goals);
-      console.log('🔍 [FamilyDashboard] Erro metas:', goalsError);
 
       if (goalsError) throw goalsError;
 
-      // Calcular estatísticas para o mês atual
       const currentMonth = new Date().getMonth();
       const currentYear = new Date().getFullYear();
 
@@ -158,119 +274,44 @@ export const FamilyDashboardVisual = () => {
 
       const savingsRate = totalIncome > 0 ? ((totalIncome - totalExpenses) / totalIncome) * 100 : 0;
 
-      console.log('🔍 [FamilyDashboard] Estatísticas calculadas:', {
-        totalIncome,
-        totalExpenses,
-        savingsRate,
-        activeGoals: goals?.length || 0,
-        totalTransactions: transactions?.length || 0
-      });
-
       setStats({
         totalIncome,
         totalExpenses,
         savingsRate,
-        activeGoals: goals?.length || 0,
-        memberCount: familyMembers.length
+        memberCount: familyMembers.length,
+        activeGoals: goals?.length || 0
+      });
+
+      console.log('🔍 [FamilyDashboard] Estatísticas calculadas:', {
+        totalIncome,
+        totalExpenses,
+        savingsRate,
+        activeGoals: goals?.length || 0
       });
     } catch (error) {
-      console.error('❌ [FamilyDashboard] Erro ao carregar estatísticas:', error);
-    }
-  };
-
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    await loadAllData();
-    setRefreshing(false);
-    toast({
-      title: 'Dados Atualizados',
-      description: 'As informações da família foram recarregadas.'
-    });
-  };
-
-  const handleRefreshStats = async () => {
-    if (!currentFamily) return;
-    
-    console.log('🔍 [FamilyDashboardVisual] Refresh manual das estatísticas');
-    setRefreshing(true);
-    
-    try {
-      await loadFamilyStats(currentFamily.id);
-      toast({
-        title: 'Estatísticas Atualizadas',
-        description: 'As estatísticas da família foram recarregadas.'
-      });
-    } catch (error) {
-      console.error('❌ [FamilyDashboardVisual] Erro no refresh manual:', error);
-      toast({
-        title: 'Erro',
-        description: 'Erro ao atualizar estatísticas',
-        variant: 'destructive'
-      });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const loadFamilyData = async () => {
-    if (!user) return;
-    
-    try {
-      console.log('🔍 [FamilyDashboard] Carregando dados da família:', user.id);
-      
-      // Carregar dados da família
-      const { data: family, error: familyError } = await supabase
-        .from('families')
-        .select('*')
-        .eq('id', user.id) // Assuming user.id is the family ID for now
-        .single();
-
-      if (familyError) {
-        console.error('Erro ao carregar família:', familyError);
-        return;
-      }
-
-      setCurrentFamily(family);
-      
-      // Carregar membros da família
-      await loadFamilyMembers(user.id);
-      
-      // Carregar estatísticas
-      await loadFamilyStats(user.id);
-      
-      console.log('🔍 [FamilyDashboard] Família carregada:', family);
-    } catch (error) {
-      console.error('Erro ao carregar dados da família:', error);
-    }
-  };
-
-  const loadFamilyMembers = async (familyId: string) => {
-    try {
-      const { data: membersData, error } = await supabase
-        .rpc('get_family_members_with_profiles', { p_family_id: familyId });
-      if (error) return;
-      if (membersData && (membersData as any).success && (membersData as any).members) {
-        setFamilyMembers((membersData as any).members);
-        setStats((prev) => ({ ...prev, memberCount: (membersData as any).members.length }));
-      } else {
-        setFamilyMembers([]);
-        setStats((prev) => ({ ...prev, memberCount: 0 }));
-      }
-    } catch (error) {
-      setFamilyMembers([]);
+      console.error('Erro ao carregar estatísticas:', error);
     }
   };
 
   const loadUserPendingInvites = async () => {
     if (!user) return;
+    
     setInvitesLoading(true);
     try {
-      const { data, error } = await (supabase as any).rpc('get_user_pending_family_invites');
-      if (data && data.success && data.invites) {
-        setPendingInvites(data.invites);
-      } else {
-        setPendingInvites([]);
+      const { data: invites, error } = await supabase
+        .from('family_invites')
+        .select('*')
+        .eq('email', user.email)
+        .eq('status', 'pending');
+
+      if (error) {
+        console.error('Erro ao carregar convites:', error);
+        return;
       }
+
+      setPendingInvites(invites as FamilyInvite[] || []);
+    } catch (error) {
+      console.error('Erro ao carregar convites:', error);
     } finally {
       setInvitesLoading(false);
     }
@@ -278,20 +319,48 @@ export const FamilyDashboardVisual = () => {
 
   const acceptInvite = async (inviteId: string) => {
     try {
-      const { data, error } = await (supabase as any).rpc('accept_family_invite_by_email', { p_invite_id: inviteId });
-      if (data && data.success) {
-        toast({ title: 'Convite aceite!', description: 'Agora faz parte da família.' });
-        await loadAllData();
-      } else {
-        toast({ title: 'Erro ao aceitar convite', description: data?.message || error?.message, variant: 'destructive' });
-      }
-    } catch (error: any) {
-      toast({ title: 'Erro ao aceitar convite', description: error.message, variant: 'destructive' });
+      const { error } = await supabase
+        .from('family_invites')
+        .update({ status: 'accepted' })
+        .eq('id', inviteId);
+
+      if (error) throw error;
+
+      toast({ title: 'Convite Aceite', description: 'Juntou-se à família com sucesso!' });
+      loadFamilyData(); // Recarregar dados
+    } catch (error) {
+      console.error('Erro ao aceitar convite:', error);
+      toast({ title: 'Erro', description: 'Erro ao aceitar convite', variant: 'destructive' });
     }
   };
 
   const rejectInvite = async (inviteId: string) => {
-    setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+    try {
+      const { error } = await supabase
+        .from('family_invites')
+        .update({ status: 'declined' })
+        .eq('id', inviteId);
+
+      if (error) throw error;
+
+      toast({ title: 'Convite Rejeitado', description: 'Convite rejeitado com sucesso.' });
+      loadUserPendingInvites(); // Recarregar convites
+    } catch (error) {
+      console.error('Erro ao rejeitar convite:', error);
+      toast({ title: 'Erro', description: 'Erro ao rejeitar convite', variant: 'destructive' });
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadFamilyData();
+    setRefreshing(false);
+  };
+
+  const handleRefreshStats = async () => {
+    if (currentFamily) {
+      await loadFamilyStats(currentFamily.id);
+    }
   };
 
   const formatCurrency = (value: number) => {
@@ -302,13 +371,13 @@ export const FamilyDashboardVisual = () => {
   };
 
   const getRoleLabel = (role: string) => {
-    const roles = {
-      owner: 'Dono',
-      admin: 'Administrador',
-      member: 'Membro',
-      viewer: 'Visualizador'
-    };
-    return roles[role as keyof typeof roles] || role;
+    switch (role) {
+      case 'owner': return 'Dono';
+      case 'admin': return 'Administrador';
+      case 'member': return 'Membro';
+      case 'viewer': return 'Visualizador';
+      default: return 'Membro';
+    }
   };
 
   const getRoleBadgeVariant = (role: string) => {
@@ -338,11 +407,11 @@ export const FamilyDashboardVisual = () => {
     toast({ title: 'Saiu da Família', description: 'Saiu da família com sucesso.' });
     
     // Recarregar famílias e selecionar a próxima disponível
-    await loadFamilyData(); // Reload current family data
+    await loadUserFamilies();
     
-    // If no family left, redirect to settings
-    if (!currentFamily) {
-      navigate('/settings');
+    // Se não houver mais famílias, redirecionar
+    if (userFamilies.length <= 1) {
+      navigate('/');
     }
   };
 
@@ -370,14 +439,6 @@ export const FamilyDashboardVisual = () => {
 
   return (
     <div className="max-w-6xl mx-auto p-4 space-y-6">
-      {/* Seletor de Família */}
-      <FamilySelector
-        selectedFamilyId={user.id} // Assuming user.id is the family ID for now
-        onFamilySelect={() => {}} // No family selection for now
-        userFamilies={[]} // No multiple families for now
-        onLeaveFamily={handleLeaveFamily}
-      />
-
       {/* Convites Pendentes */}
       {pendingInvites.length > 0 && (
         <Card className="border-yellow-400">
@@ -414,6 +475,46 @@ export const FamilyDashboardVisual = () => {
           {/* Header e Estatísticas */}
           <div className="flex items-start justify-between">
             <div className="flex-1">
+              {/* Seletor de Família - Dropdown */}
+              {userFamilies.length > 1 && (
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    Selecionar Família:
+                  </label>
+                  <div className="flex gap-2 items-center">
+                    <select
+                      value={selectedFamilyId}
+                      onChange={(e) => {
+                        const familyId = e.target.value;
+                        setSelectedFamilyId(familyId);
+                      }}
+                      className="flex-1 max-w-xs p-2 border rounded-md bg-background"
+                    >
+                      {userFamilies.map((family) => (
+                        <option key={family.id} value={family.id}>
+                          {family.nome} ({family.userRole})
+                        </option>
+                      ))}
+                    </select>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleLeaveFamily(selectedFamilyId)}
+                      disabled={currentFamily?.userRole === 'owner'}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <LogOut className="h-4 w-4 mr-1" />
+                      Sair
+                    </Button>
+                  </div>
+                  {currentFamily?.userRole === 'owner' && (
+                    <p className="text-xs text-red-600 mt-1">
+                      ⚠️ Como owner, deve transferir o ownership antes de sair da família.
+                    </p>
+                  )}
+                </div>
+              )}
+              
               <h1 className="text-3xl font-bold flex items-center gap-2">
                 <Users className="h-8 w-8 text-primary" />
                 {currentFamily.nome}
@@ -520,7 +621,7 @@ export const FamilyDashboardVisual = () => {
                 <CardTitle className="flex items-center gap-2">Gráfico de Despesas</CardTitle>
               </CardHeader>
               <CardContent>
-                <ExpensesPieChart familyId={user.id} />
+                <ExpensesPieChart familyId={currentFamily.id} />
               </CardContent>
             </Card>
             <Card>
@@ -528,7 +629,7 @@ export const FamilyDashboardVisual = () => {
                 <CardTitle className="flex items-center gap-2">Tendência Mensal</CardTitle>
               </CardHeader>
               <CardContent>
-                <MonthlyTrendChart familyId={user.id} />
+                <MonthlyTrendChart familyId={currentFamily.id} />
               </CardContent>
             </Card>
           </div>
@@ -538,7 +639,7 @@ export const FamilyDashboardVisual = () => {
               <CardTitle className="flex items-center gap-2">Últimas Transações da Família</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions familyId={user.id} />
+              <RecentTransactions familyId={currentFamily.id} />
             </CardContent>
           </Card>
 
@@ -576,30 +677,9 @@ export const FamilyDashboardVisual = () => {
           </Card>
 
           {/* Metas da Família */}
-          <GoalsManager familyId={user.id} />
+          <GoalsManager familyId={currentFamily.id} />
 
-          {/* Placeholder para Metas da Família */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Target className="h-5 w-5" />
-                Metas da Família
-              </CardTitle>
-              <CardDescription>
-                Metas ativas de todos os membros (em desenvolvimento)
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Target className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">
-                  Funcionalidade de metas familiares em desenvolvimento
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Debug Section (temporário) */}
+          {/* Debug Section */}
           <Card className="border-orange-400">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-orange-700">Debug - Estado Atual</CardTitle>
@@ -622,9 +702,9 @@ export const FamilyDashboardVisual = () => {
       ) : (
         <div className="text-center py-12">
           <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Nenhuma Família Selecionada</h2>
+          <h2 className="text-2xl font-bold mb-2">Nenhuma Família Encontrada</h2>
           <p className="text-muted-foreground mb-6">
-            Selecione uma família no seletor acima ou crie uma nova família.
+            Precisa de criar ou juntar-se a uma família para ver o dashboard.
           </p>
           <Button onClick={() => navigate('/settings')} className="mr-4">
             <Settings className="h-4 w-4 mr-2" />

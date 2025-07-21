@@ -9,7 +9,18 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
-import { Users, UserPlus, RefreshCw, Settings, Edit, Save, X, Trash2, ShieldCheck } from 'lucide-react';
+import {
+  Users,
+  UserPlus,
+  RefreshCw,
+  Settings,
+  Edit,
+  Save,
+  X,
+  Trash2,
+  ShieldCheck,
+  LogOut
+} from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -28,18 +39,22 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useNavigate } from 'react-router-dom';
 
 export const SimpleFamilyManager = () => {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [currentFamily, setCurrentFamily] = useState<any>(null);
-  const [familyName, setFamilyName] = useState('');
-  const [createLoading, setCreateLoading] = useState(false);
-  const [debugData, setDebugData] = useState<any>(null);
-  
-  // Estados para edição de configurações
+  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
+  const [invitesLoading, setInvitesLoading] = useState(false);
   const [editingSettings, setEditingSettings] = useState(false);
+  const [saveLoading, setSaveLoading] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('member');
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [editForm, setEditForm] = useState({
     nome: '',
     description: '',
@@ -47,145 +62,162 @@ export const SimpleFamilyManager = () => {
     allowAddTransactions: true,
     requireApproval: false
   });
-  const [saveLoading, setSaveLoading] = useState(false);
-  
-  // Estados para gestão de membros
-  const [familyMembers, setFamilyMembers] = useState<any[]>([]);
+
+  // Estados que faltavam
+  const [familyName, setFamilyName] = useState('');
+  const [createLoading, setCreateLoading] = useState(false);
+  const [debugData, setDebugData] = useState<any>(null);
+
+  // Novos estados para múltiplas famílias
+  const [userFamilies, setUserFamilies] = useState<any[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
+  const [familiesLoading, setFamiliesLoading] = useState(false);
   const [membersLoading, setMembersLoading] = useState(false);
-  const [inviteEmail, setInviteEmail] = useState('');
-  const [inviteRole, setInviteRole] = useState('member');
-  const [inviteLoading, setInviteLoading] = useState(false);
-  const [pendingInvites, setPendingInvites] = useState<any[]>([]);
-  const [invitesLoading, setInvitesLoading] = useState(false);
 
   useEffect(() => {
     if (user && !authLoading) {
-      console.log('🔍 SimpleFamilyManager - User carregado, iniciando loadFamily');
-      loadFamily();
-    } else {
-      console.log('🔍 SimpleFamilyManager - User ainda não carregado ou authLoading:', { user: !!user, authLoading });
-      setLoading(false);
+      loadUserFamilies();
     }
   }, [user, authLoading]);
 
-  useEffect(() => {
-    if (currentFamily) {
-      loadPendingInvites(currentFamily.id);
-    }
-  }, [currentFamily]);
-
-  const loadFamily = async () => {
+  // Carregar todas as famílias do utilizador
+  const loadUserFamilies = async () => {
     if (!user) return;
-
+    
+    setFamiliesLoading(true);
+    setLoading(true);
+    
     try {
-      setLoading(true);
-      console.log('🔍 SimpleFamilyManager - === INÍCIO DO CARREGAMENTO ===');
-      console.log('🔍 SimpleFamilyManager - User ID:', user.id);
-      console.log('🔍 SimpleFamilyManager - User Email:', user.email);
-
-      const { data, error } = await supabase
-        .rpc('get_user_family_data', { p_user_id: user.id });
-
-      console.log('🔍 SimpleFamilyManager - === RESPOSTA DO SUPABASE ===');
-      console.log('🔍 SimpleFamilyManager - Data:', data);
-      console.log('🔍 SimpleFamilyManager - Error:', error);
-      console.log('🔍 SimpleFamilyManager - Data JSON:', JSON.stringify(data, null, 2));
-      
-      setDebugData({ data, error });
+      const { data: familyMembers, error } = await supabase
+        .from('family_members')
+        .select(`
+          family_id,
+          role,
+          families (*)
+        `)
+        .eq('user_id', user.id);
 
       if (error) {
-        console.error('❌ SimpleFamilyManager - Erro:', error);
-        setCurrentFamily(null);
+        console.error('Erro ao carregar famílias:', error);
+        setLoading(false);
         return;
       }
 
-      // Processar resposta
-      if (data) {
-        console.log('🔍 SimpleFamilyManager - === PROCESSAMENTO DOS DADOS ===');
+      if (familyMembers && familyMembers.length > 0) {
+        const familiesData = familyMembers.map(fm => ({
+          ...fm.families,
+          userRole: fm.role
+        }));
         
-        // A função agora retorna diretamente um array com os dados
-        if (Array.isArray(data) && data.length > 0) {
-          const familyInfo = data[0] as any;
-          console.log('🔍 SimpleFamilyManager - Family info:', familyInfo);
-          
-          if (familyInfo && familyInfo.family) {
-            console.log('✅ SimpleFamilyManager - FAMÍLIA ENCONTRADA:', familyInfo.family);
-            setCurrentFamily(familyInfo.family);
-            
-            // Preencher formulário de edição com dados atuais
-            const family = familyInfo.family;
-            setEditForm({
-              nome: family.nome || '',
-              description: family.description || '',
-              allowViewAll: family.settings?.allow_view_all ?? true,
-              allowAddTransactions: family.settings?.allow_add_transactions ?? true,
-              requireApproval: family.settings?.require_approval ?? false
-            });
-            
-            // Carregar membros da família
-            loadFamilyMembers(family.id);
-          } else {
-            console.log('❌ SimpleFamilyManager - Sem dados de família no familyInfo');
-            setCurrentFamily(null);
-          }
-        } else {
-          console.log('❌ SimpleFamilyManager - Data não é um array ou está vazio');
-          setCurrentFamily(null);
+        setUserFamilies(familiesData);
+        
+        // Selecionar a primeira família por padrão
+        if (!selectedFamilyId && familiesData.length > 0) {
+          setSelectedFamilyId(familiesData[0].id);
+          setCurrentFamily(familiesData[0]);
         }
       } else {
-        console.log('❌ SimpleFamilyManager - Sem dados na resposta');
+        setUserFamilies([]);
         setCurrentFamily(null);
       }
-
-    } catch (error: any) {
-      console.error('❌ SimpleFamilyManager - Erro ao carregar família:', error);
+    } catch (error) {
+      console.error('Erro ao carregar famílias:', error);
     } finally {
+      setFamiliesLoading(false);
       setLoading(false);
-      console.log('🔍 SimpleFamilyManager - === FIM DO CARREGAMENTO ===');
+    }
+  };
+
+  // Carregar dados da família selecionada
+  useEffect(() => {
+    if (selectedFamilyId && user) {
+      // Limpar estados ao mudar de família
+      setEditForm({
+        nome: '',
+        description: '',
+        allowViewAll: true,
+        allowAddTransactions: true,
+        requireApproval: false
+      });
+      setPendingInvites([]);
+      setCurrentFamily(null);
+      // NÃO limpar familyMembers aqui!
+      loadFamily();
+    }
+  }, [selectedFamilyId, user]);
+
+  const loadFamily = async () => {
+    if (!selectedFamilyId || !user) return;
+    
+    console.log('🔍 [SimpleFamilyManager] Carregando dados da família:', selectedFamilyId);
+    
+    try {
+      // Encontrar a família selecionada
+      const selectedFamily = userFamilies.find(f => f.id === selectedFamilyId);
+      if (!selectedFamily) {
+        console.error('Família selecionada não encontrada');
+        return;
+      }
+
+      setCurrentFamily(selectedFamily);
+      
+      // Carregar membros da família
+      await loadFamilyMembers(selectedFamilyId);
+      
+      // Carregar convites pendentes
+      await loadPendingInvites(selectedFamilyId);
+      
+      console.log('🔍 [SimpleFamilyManager] Dados da família carregados:', selectedFamily);
+    } catch (error) {
+      console.error('Erro ao carregar dados da família:', error);
     }
   };
 
   const loadFamilyMembers = async (familyId: string) => {
+    setMembersLoading(true);
     try {
-      setMembersLoading(true);
-      const { data, error } = await supabase
-        .rpc('get_family_members_with_profiles', { p_family_id: familyId });
+      console.log('🔍 [SimpleFamilyManager] A carregar membros para família:', familyId);
+      const { data: members, error } = await supabase
+        .from('family_members')
+        .select(`
+          *,
+          profiles (nome, email)
+        `)
+        .eq('family_id', familyId);
+
+      console.log('🔍 [SimpleFamilyManager] Resultado da query membros:', { members, error });
 
       if (error) {
-        console.error('❌ Erro ao carregar membros:', error);
+        console.error('Erro ao carregar membros:', error);
         return;
       }
 
-      if (data && (data as any).success && (data as any).members) {
-        setFamilyMembers((data as any).members);
-      } else {
-        setFamilyMembers([]);
-      }
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar membros:', error);
+      setFamilyMembers(members || []);
+      console.log('🔍 [SimpleFamilyManager] Estado familyMembers atualizado:', members);
+    } catch (error) {
+      console.error('Erro ao carregar membros:', error);
     } finally {
       setMembersLoading(false);
     }
   };
 
   const loadPendingInvites = async (familyId: string) => {
+    setInvitesLoading(true);
     try {
-      setInvitesLoading(true);
-      const { data, error } = await (supabase as any)
-        .rpc('get_family_pending_invites', { p_family_id: familyId });
+      const { data: invites, error } = await supabase
+        .from('family_invites')
+        .select('*')
+        .eq('family_id', familyId)
+        .eq('status', 'pending');
 
       if (error) {
-        console.error('❌ Erro ao carregar convites:', error);
+        console.error('Erro ao carregar convites:', error);
         return;
       }
 
-      if (data && (data as any).success && (data as any).invites) {
-        setPendingInvites((data as any).invites);
-      } else {
-        setPendingInvites([]);
-      }
-    } catch (error: any) {
-      console.error('❌ Erro ao carregar convites:', error);
+      setPendingInvites(invites || []);
+    } catch (error) {
+      console.error('Erro ao carregar convites:', error);
     } finally {
       setInvitesLoading(false);
     }
@@ -444,6 +476,28 @@ export const SimpleFamilyManager = () => {
   };
 
   const isOwner = currentFamily && familyMembers.find(m => m.user_id === user?.id)?.role === 'owner';
+  const userRole = currentFamily && familyMembers.find(m => m.user_id === user?.id)?.role;
+
+  // Função para sair de uma família específica
+  const handleLeaveFamily = async (familyId: string) => {
+    if (!user) return;
+    
+    const { error } = await supabase
+      .from('family_members')
+      .delete()
+      .eq('family_id', familyId)
+      .eq('user_id', user.id);
+      
+    if (error) {
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
+      return;
+    }
+    
+    toast({ title: 'Saiu da Família', description: 'Saiu da família com sucesso.' });
+    
+    // Recarregar famílias
+    await loadUserFamilies();
+  };
 
   if (authLoading) {
     return (
@@ -504,7 +558,30 @@ export const SimpleFamilyManager = () => {
                 Edite as configurações básicas da família
               </CardDescription>
             </CardHeader>
-                        <CardContent>
+            <CardContent>
+              {/* Seletor de Família */}
+              {userFamilies.length > 1 && (
+                <div className="mb-6 p-4 bg-muted/50 rounded-lg">
+                  <label className="text-sm font-medium text-muted-foreground mb-2 block">
+                    Selecionar Família para Configurar:
+                  </label>
+                  <select
+                    value={selectedFamilyId}
+                    onChange={(e) => {
+                      const familyId = e.target.value;
+                      setSelectedFamilyId(familyId);
+                    }}
+                    className="w-full max-w-xs p-2 border rounded-md bg-background"
+                  >
+                    {userFamilies.map((family) => (
+                      <option key={family.id} value={family.id}>
+                        {family.nome} ({family.userRole})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               {editingSettings && isOwner ? (
                 <div className="space-y-4">
                   <div>
@@ -626,6 +703,35 @@ export const SimpleFamilyManager = () => {
                       Apenas o dono da família pode editar estas configurações.
                     </p>
                   )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Sair da Família */}
+          <Card className="border-orange-400">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-orange-700">
+                <Users className="h-5 w-5" />
+                Sair da Família
+              </CardTitle>
+              <CardDescription>
+                Esta ação irá remover o seu acesso a todos os dados e transações desta família.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button
+                variant="outline"
+                className="border-orange-500 text-orange-700 font-bold w-full flex items-center gap-2 justify-center"
+                onClick={() => handleLeaveFamily(selectedFamilyId)}
+                disabled={currentFamily?.userRole === 'owner' && familyMembers.filter(m => m.user_id !== user?.id).length > 0}
+              >
+                <Users className="h-4 w-4" />
+                Sair da Família Atual
+              </Button>
+              {currentFamily?.userRole === 'owner' && familyMembers.filter(m => m.user_id !== user?.id).length > 0 && (
+                <div className="text-red-600 text-xs mt-2 text-center">
+                  ⚠️ Como owner, deve transferir o ownership antes de sair da família.
                 </div>
               )}
             </CardContent>
