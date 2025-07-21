@@ -56,6 +56,8 @@ export const Dashboard = () => {
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
   const [showAddAccount, setShowAddAccount] = useState(false);
   const [newAccountName, setNewAccountName] = useState('');
+  // Adicionar estado para stats da conta selecionada
+  const [accountStats, setAccountStats] = useState<DashboardStats | null>(null);
 
   // Gerar opções de meses
   const getMonthOptions = () => {
@@ -101,7 +103,7 @@ export const Dashboard = () => {
       console.log('🔍 [Dashboard] Carregando transações pessoais...');
       const { data: transactions, error: transactionsError } = await supabase
         .from('transactions')
-        .select('*')
+        .select('*, account_id')
         .eq('user_id', user.id)
         .is('family_id', null);
 
@@ -184,6 +186,26 @@ export const Dashboard = () => {
         taxaPoupanca,
         upcomingBills: []
       });
+
+      // Calcular stats da conta selecionada (se não for 'all')
+      if (selectedAccountId && selectedAccountId !== 'all') {
+        const filteredByAccount = filteredTransactions.filter(t => t.account_id === selectedAccountId);
+        const receitasAcc = filteredByAccount.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
+        const despesasAcc = filteredByAccount.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + (Number(t.valor) || 0), 0);
+        const saldoAcc = receitasAcc - despesasAcc;
+        const taxaPoupancaAcc = receitasAcc > 0 ? (saldoAcc / receitasAcc) * 100 : 0;
+        setAccountStats({
+          receitas: receitasAcc,
+          despesas: despesasAcc,
+          saldo: saldoAcc,
+          metasAtivas: 0,
+          poupancaMensal: saldoAcc,
+          taxaPoupanca: taxaPoupancaAcc,
+          upcomingBills: []
+        });
+      } else {
+        setAccountStats(null);
+      }
     } catch (error) {
       console.error('❌ [Dashboard] Erro ao carregar dados:', error);
       setStats({
@@ -198,7 +220,7 @@ export const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  }, [user, selectedMonth]);
+  }, [user, selectedMonth, selectedAccountId]);
 
   useEffect(() => {
     loadDashboardData();
@@ -218,9 +240,6 @@ export const Dashboard = () => {
       .order('created_at', { ascending: true });
     if (!error) {
       setAccounts(data || []);
-      if (data && data.length > 0 && selectedAccountId === 'all') {
-        setSelectedAccountId(data[0].id);
-      }
     }
   };
 
@@ -376,6 +395,45 @@ export const Dashboard = () => {
           </CardContent>
         </Card>
       </div>
+
+      {accountStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+          <Card className="py-2 h-24">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-xs font-medium">Rendimento da Conta</CardTitle>
+              <TrendingUp className="h-4 w-4 text-income" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-base font-bold text-income">
+                {formatCurrency(accountStats.receitas)}
+              </div>
+              <p className="text-xs text-muted-foreground">{getMonthLabel()}</p>
+            </CardContent>
+          </Card>
+          <Card className="py-2 h-24">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-xs font-medium">Despesas da Conta</CardTitle>
+              <TrendingDown className="h-4 w-4 text-expense" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-base font-bold text-expense">
+                {formatCurrency(accountStats.despesas)}
+              </div>
+              <p className="text-xs text-muted-foreground">{getMonthLabel()}</p>
+            </CardContent>
+          </Card>
+          <Card className="py-2 h-24">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
+              <CardTitle className="text-xs font-medium">Taxa de Poupança</CardTitle>
+              <PiggyBank className="h-4 w-4 text-savings" />
+            </CardHeader>
+            <CardContent>
+              <div className={`text-base font-bold ${getSavingsColor(accountStats.taxaPoupanca)}`}>{accountStats.taxaPoupanca.toFixed(1)}%</div>
+              <p className="text-xs text-muted-foreground">{formatCurrency(accountStats.saldo)}</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Upcoming Bills */}
       <Card>

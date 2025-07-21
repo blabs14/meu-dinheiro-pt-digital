@@ -209,24 +209,6 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="tipo">Tipo</Label>
-            <Select
-              value={formData.tipo}
-              onValueChange={(value: 'receita' | 'despesa') => 
-                setFormData(prev => ({ ...prev, tipo: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="receita">Receita</SelectItem>
-                <SelectItem value="despesa">Despesa</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
             <Label htmlFor="valor">Valor (€)</Label>
             <Input
               id="valor"
@@ -285,22 +267,6 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
                     </div>
                   </SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="modo">Modo</Label>
-            <Select
-              value={formData.modo}
-              onValueChange={(value) => setFormData(prev => ({ ...prev, modo: value }))}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="pessoal">Pessoal</SelectItem>
-                <SelectItem value="partilhado">Partilhado</SelectItem>
               </SelectContent>
             </Select>
           </div>
