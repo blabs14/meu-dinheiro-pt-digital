@@ -52,6 +52,10 @@ export const Dashboard = () => {
     taxaPoupanca: 0,
     upcomingBills: []
   });
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
 
   // Gerar opções de meses
   const getMonthOptions = () => {
@@ -200,6 +204,40 @@ export const Dashboard = () => {
     loadDashboardData();
   }, [loadDashboardData]);
 
+  useEffect(() => {
+    if (user) {
+      loadUserAccounts();
+    }
+  }, [user]);
+
+  const loadUserAccounts = async () => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+    if (!error) {
+      setAccounts(data || []);
+      if (data && data.length > 0 && selectedAccountId === 'all') {
+        setSelectedAccountId(data[0].id);
+      }
+    }
+  };
+
+  const handleAddAccount = async () => {
+    if (!newAccountName.trim()) return;
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert({ user_id: user.id, nome: newAccountName.trim() })
+      .select();
+    if (!error && data && data[0]) {
+      setAccounts(prev => [...prev, data[0]]);
+      setSelectedAccountId(data[0].id);
+      setShowAddAccount(false);
+      setNewAccountName('');
+    }
+  };
+
   const handleAddTransaction = (type: 'receita' | 'despesa') => {
     setTransactionType(type);
     setShowTransactionForm(true);
@@ -248,7 +286,36 @@ export const Dashboard = () => {
     <div className="max-w-6xl mx-auto p-4 space-y-6">
       {/* Filtro de Mês */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Dashboard Pessoal</h1>
+        <h1 className="text-2xl font-bold mb-4">Dashboard Pessoal</h1>
+        <div className="flex items-center gap-4 mb-4">
+          <label className="text-sm font-medium text-muted-foreground">Conta:</label>
+          <select
+            value={selectedAccountId}
+            onChange={e => setSelectedAccountId(e.target.value)}
+            className="w-[200px] p-2 border rounded-md bg-background"
+          >
+            <option value="all">Todas as Contas</option>
+            {accounts && accounts.length > 0 && accounts.map(acc => (
+              <option key={acc.id} value={acc.id}>{acc.nome}</option>
+            ))}
+          </select>
+          <Button variant="outline" size="sm" onClick={() => setShowAddAccount(true)}>
+            <Plus className="h-4 w-4 mr-1" /> Adicionar Conta
+          </Button>
+        </div>
+        {showAddAccount && (
+          <div className="mb-4 flex gap-2 items-center">
+            <input
+              type="text"
+              value={newAccountName}
+              onChange={e => setNewAccountName(e.target.value)}
+              placeholder="Nome da nova conta"
+              className="p-2 border rounded-md"
+            />
+            <Button size="sm" onClick={handleAddAccount}>Criar</Button>
+            <Button size="sm" variant="ghost" onClick={() => setShowAddAccount(false)}>Cancelar</Button>
+          </div>
+        )}
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>

@@ -16,7 +16,8 @@ import {
   Check,
   X,
   LogOut,
-  Filter
+  Filter,
+  Plus
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
@@ -106,6 +107,12 @@ export const FamilyDashboardVisualFixed = () => {
     }
     return options;
   };
+
+  // Novos estados para múltiplas contas bancárias
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all');
+  const [showAddAccount, setShowAddAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState('');
 
   useEffect(() => {
     console.log('🔍 [FamilyDashboard] useEffect triggered:', { user: !!user, authLoading, loading });
@@ -252,14 +259,53 @@ export const FamilyDashboardVisualFixed = () => {
     }
   };
 
+  // Carregar contas do utilizador
+  useEffect(() => {
+    if (user) {
+      loadUserAccounts();
+    }
+  }, [user]);
+
+  const loadUserAccounts = async () => {
+    const { data, error } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+    if (!error) {
+      setAccounts(data || []);
+      if (data && data.length > 0 && selectedAccountId === 'all') {
+        setSelectedAccountId(data[0].id);
+      }
+    }
+  };
+
+  const handleAddAccount = async () => {
+    if (!newAccountName.trim()) return;
+    const { data, error } = await supabase
+      .from('accounts')
+      .insert({ user_id: user.id, nome: newAccountName.trim() })
+      .select();
+    if (!error && data && data[0]) {
+      setAccounts(prev => [...prev, data[0]]);
+      setSelectedAccountId(data[0].id);
+      setShowAddAccount(false);
+      setNewAccountName('');
+    }
+  };
+
   const loadFamilyStats = async (familyId: string) => {
     try {
       console.log('🔍 [FamilyDashboard] Carregando estatísticas da família:', familyId);
       
-      const { data: transactions, error: transactionsError } = await supabase
+      let query = supabase
         .from('transactions')
         .select('*')
         .eq('family_id', familyId);
+      if (selectedAccountId !== 'all') {
+        query = query.eq('account_id', selectedAccountId);
+      }
+      const { data: transactions, error: transactionsError } = await query;
 
       if (transactionsError) throw transactionsError;
 
@@ -590,6 +636,12 @@ export const FamilyDashboardVisualFixed = () => {
                 Gerir Família
               </Button>
             </div>
+          </div>
+
+          {/* DEBUG: Mostrar estado das contas e do utilizador */}
+          <div className="mb-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+            <div><b>DEBUG:</b> user: {user ? user.id : 'null'} | accounts: {accounts.length} contas</div>
+            <div>selectedAccountId: {selectedAccountId}</div>
           </div>
 
           {/* Stats Cards */}
