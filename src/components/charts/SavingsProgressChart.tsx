@@ -18,9 +18,10 @@ interface SavingsData {
 interface SavingsProgressChartProps {
   refreshTrigger?: number;
   familyId?: string;
+  accountId?: string;
 }
 
-export const SavingsProgressChart = ({ refreshTrigger, familyId }: SavingsProgressChartProps) => {
+export const SavingsProgressChart = ({ refreshTrigger, familyId, accountId }: SavingsProgressChartProps) => {
   const { user } = useAuth();
   const [data, setData] = useState<SavingsData>({
     totalIncome: 0,
@@ -35,7 +36,7 @@ export const SavingsProgressChart = ({ refreshTrigger, familyId }: SavingsProgre
     if (user) {
       loadSavingsData();
     }
-  }, [user, refreshTrigger, familyId]);
+  }, [user, refreshTrigger, familyId, accountId]);
 
   const loadSavingsData = async () => {
     try {
@@ -51,6 +52,11 @@ export const SavingsProgressChart = ({ refreshTrigger, familyId }: SavingsProgre
       } else {
         // Se não for fornecido, mostrar apenas transações pessoais (family_id IS NULL)
         query = query.is('family_id', null);
+      }
+
+      // Se accountId for fornecido e diferente de 'all', filtrar por account_id
+      if (accountId && accountId !== 'all') {
+        query = query.eq('account_id', accountId);
       }
       
       const { data: transactions, error: transactionsError } = await query

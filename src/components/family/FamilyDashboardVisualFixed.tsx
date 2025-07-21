@@ -25,6 +25,7 @@ import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
 import { RecentTransactions } from '@/components/transactions/RecentTransactions';
 import { GoalsManager } from '@/components/goals/GoalsManager';
 import { FamilySelector } from './FamilySelector';
+import { SavingsProgressChart } from '@/components/charts/SavingsProgressChart';
 
 interface FamilyMember {
   id: string;
@@ -710,7 +711,7 @@ export const FamilyDashboardVisualFixed = () => {
                 <CardTitle className="flex items-center gap-2">Gráfico de Despesas</CardTitle>
               </CardHeader>
               <CardContent>
-                <ExpensesPieChart familyId={currentFamily.id} selectedMonth={selectedMonth} />
+                <ExpensesPieChart familyId={currentFamily.id} accountId={selectedAccountId} selectedMonth={selectedMonth} />
               </CardContent>
             </Card>
             <Card>
@@ -718,7 +719,7 @@ export const FamilyDashboardVisualFixed = () => {
                 <CardTitle className="flex items-center gap-2">Tendência Mensal</CardTitle>
               </CardHeader>
               <CardContent>
-                <MonthlyTrendChart familyId={currentFamily.id} selectedMonth={selectedMonth} />
+                <MonthlyTrendChart familyId={currentFamily.id} accountId={selectedAccountId} selectedMonth={selectedMonth} />
               </CardContent>
             </Card>
           </div>
@@ -728,7 +729,7 @@ export const FamilyDashboardVisualFixed = () => {
               <CardTitle className="flex items-center gap-2">Últimas Transações da Família</CardTitle>
             </CardHeader>
             <CardContent>
-              <RecentTransactions familyId={currentFamily.id} selectedMonth={selectedMonth} />
+              <RecentTransactions familyId={currentFamily.id} accountId={selectedAccountId} />
             </CardContent>
           </Card>
 
@@ -767,6 +768,22 @@ export const FamilyDashboardVisualFixed = () => {
 
           {/* Metas da Família */}
           <GoalsManager familyId={currentFamily.id} />
+
+          {/* Taxa de Poupança */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PiggyBank className="h-5 w-5" />
+                Taxa de Poupança
+              </CardTitle>
+              <CardDescription>
+                Acompanhe sua taxa de poupança ao longo do tempo.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SavingsProgressChart familyId={currentFamily.id} accountId={selectedAccountId} selectedMonth={selectedMonth} />
+            </CardContent>
+          </Card>
 
           {/* Debug Section */}
           <Card className="border-orange-400">

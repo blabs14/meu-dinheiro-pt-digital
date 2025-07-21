@@ -33,9 +33,10 @@ interface CustomLegendProps {
 export interface ExpensesPieChartProps {
   familyId?: string | null;
   selectedMonth?: string;
+  accountId?: string;
 }
 
-export const ExpensesPieChart = ({ familyId, selectedMonth = 'current' }: ExpensesPieChartProps) => {
+export const ExpensesPieChart = ({ familyId, selectedMonth = 'current', accountId }: ExpensesPieChartProps) => {
   const { user } = useAuth();
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,7 +46,7 @@ export const ExpensesPieChart = ({ familyId, selectedMonth = 'current' }: Expens
     if (user) {
       loadExpensesData();
     }
-  }, [user, familyId, selectedMonth]);
+  }, [user, familyId, selectedMonth, accountId]);
 
   const loadExpensesData = async () => {
     try {
@@ -68,6 +69,11 @@ export const ExpensesPieChart = ({ familyId, selectedMonth = 'current' }: Expens
         query = query.eq('family_id', familyId);
       } else {
         query = query.is('family_id', null);
+      }
+
+      // Filtro de conta
+      if (accountId && accountId !== 'all') {
+        query = query.eq('account_id', accountId);
       }
 
       const { data: transactions, error } = await query;

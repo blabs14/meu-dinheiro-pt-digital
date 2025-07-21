@@ -26,9 +26,10 @@ interface CustomTooltipProps {
 
 export interface MonthlyTrendChartProps {
   familyId?: string;
+  accountId?: string;
 }
 
-export const MonthlyTrendChart = ({ familyId }: MonthlyTrendChartProps) => {
+export const MonthlyTrendChart = ({ familyId, accountId }: MonthlyTrendChartProps) => {
   const { user } = useAuth();
   const [data, setData] = useState<ChartData[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,11 @@ export const MonthlyTrendChart = ({ familyId }: MonthlyTrendChartProps) => {
         query = query.is('family_id', null);
       }
       
+      // Filtro de conta
+      if (accountId && accountId !== 'all') {
+        query = query.eq('account_id', accountId);
+      }
+
       query = query.gte('data', sixMonthsAgo).lt('data', nextMonth).order('data');
 
       const { data: transactions, error } = await query;
@@ -102,13 +108,13 @@ export const MonthlyTrendChart = ({ familyId }: MonthlyTrendChartProps) => {
     } finally {
       setLoading(false);
     }
-  }, [familyId]);
+  }, [familyId, accountId]);
 
   useEffect(() => {
     if (user) {
       loadMonthlyTrend();
     }
-  }, [user, familyId, loadMonthlyTrend]);
+  }, [user, familyId, accountId, loadMonthlyTrend]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {

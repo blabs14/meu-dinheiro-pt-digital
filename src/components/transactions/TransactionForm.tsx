@@ -15,6 +15,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 
 interface Category {
   id: string;
@@ -36,10 +37,11 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [date, setDate] = useState<Date>(new Date());
-  const [isFamily, setIsFamily] = useState(false);
-  const [familyId, setFamilyId] = useState<string | null>(null);
-  const [familyIdLoading, setFamilyIdLoading] = useState(false);
-  const [familyIdError, setFamilyIdError] = useState<string | null>(null);
+  const [transactionType, setTransactionType] = useState<'pessoal' | 'familiar'>('pessoal');
+  const [accounts, setAccounts] = useState<any[]>([]);
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('');
+  const [families, setFamilies] = useState<any[]>([]);
+  const [selectedFamilyId, setSelectedFamilyId] = useState<string>('');
 
   const form = {
     tipo: defaultType,
@@ -53,6 +55,8 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
   useEffect(() => {
     if (open) {
       loadCategories();
+      loadAccounts();
+      loadFamilies();
       setFormData({
         tipo: defaultType,
         valor: '',
@@ -61,27 +65,11 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
         modo: 'pessoal',
         data: new Date()
       });
+      setTransactionType('pessoal');
+      setSelectedAccountId('');
+      setSelectedFamilyId('');
     }
   }, [open, defaultType]);
-
-  useEffect(() => {
-    const fetchFamily = async () => {
-      setFamilyIdLoading(true);
-      setFamilyIdError(null);
-      if (user) {
-        const { data } = await supabase.rpc('get_user_family_data', { p_user_id: user.id });
-        console.log('🔍 [TransactionForm] get_user_family_data:', data);
-        if (data && Array.isArray(data) && (data[0] as any)?.family?.id) {
-          setFamilyId((data[0] as any).family.id);
-        } else {
-          setFamilyId(null);
-          setFamilyIdError('Não foi possível obter o ID da família.');
-        }
-      }
-      setFamilyIdLoading(false);
-    };
-    fetchFamily();
-  }, [user]);
 
   const loadCategories = useCallback(async () => {
     const { data } = await supabase
@@ -94,6 +82,27 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
     }
   }, []);
 
+  const loadAccounts = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: true });
+    setAccounts(data || []);
+  };
+
+  const loadFamilies = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('family_members')
+      .select('family_id, families (id, nome)')
+      .eq('user_id', user.id);
+    if (data) {
+      setFamilies(data.map(fm => fm.families));
+    }
+  };
+
   useEffect(() => {
     loadCategories();
   }, [loadCategories]);
@@ -102,34 +111,13 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user || !selectedAccountId || (transactionType === 'familiar' && !selectedFamilyId)) return;
 
     setLoading(true);
     try {
       console.log('🔍 [TransactionForm] Iniciando criação de transação');
       console.log('🔍 [TransactionForm] Dados do formulário:', formData);
       console.log('🔍 [TransactionForm] User ID:', user.id);
-      console.log('🔍 [TransactionForm] Is Family:', isFamily);
-
-      // Buscar family_id se for transação familiar
-      let familyId = null;
-      if (isFamily) {
-        console.log('🔍 [TransactionForm] Buscando family_id para transação familiar');
-        const { data: familyData, error: familyError } = await supabase
-          .rpc('get_user_family_data', { p_user_id: user.id });
-        
-        console.log('🔍 [TransactionForm] Resultado da busca de família:', familyData);
-        console.log('🔍 [TransactionForm] Erro na busca de família:', familyError);
-        
-        if (familyData && Array.isArray(familyData) && familyData[0]?.family?.id) {
-          familyId = familyData[0].family.id;
-          console.log('✅ [TransactionForm] Family ID encontrado:', familyId);
-        } else {
-          console.log('❌ [TransactionForm] Nenhum family ID encontrado');
-        }
-      } else {
-        console.log('✅ [TransactionForm] Transação pessoal - family_id será null');
-      }
 
       const transactionData = {
         user_id: user.id,
@@ -139,7 +127,8 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
         data: date.toISOString().split('T')[0],
         descricao: formData.descricao,
         modo: formData.modo,
-        family_id: familyId
+        account_id: selectedAccountId,
+        family_id: transactionType === 'familiar' ? selectedFamilyId : null
       };
 
       console.log('🔍 [TransactionForm] Dados finais da transação:', transactionData);
@@ -167,10 +156,10 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
         valor: '',
         categoria_id: '',
         descricao: '',
-        modo: 'pessoal'
+        modo: 'pessoal',
+        data: new Date()
       });
       setDate(new Date());
-      setIsFamily(false);
       
       onSuccess?.();
       onOpenChange?.(false);
@@ -327,9 +316,46 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
             />
           </div>
 
-          <div className="flex items-center gap-2 mb-4">
-            <Switch id="is-family" checked={isFamily} onCheckedChange={setIsFamily} />
-            <label htmlFor="is-family" className="text-sm">Esta transação é da família?</label>
+          <div className="mb-4">
+            <Label>Tipo de transação</Label>
+            <ToggleGroup type="single" value={transactionType} onValueChange={v => v && setTransactionType(v as 'pessoal' | 'familiar')}>
+              <ToggleGroupItem value="pessoal">Pessoal</ToggleGroupItem>
+              <ToggleGroupItem value="familiar">Familiar</ToggleGroupItem>
+            </ToggleGroup>
+          </div>
+
+          {transactionType === 'familiar' && (
+            <div className="space-y-2">
+              <Label htmlFor="family">Família</Label>
+              <select
+                id="family"
+                required
+                value={selectedFamilyId}
+                onChange={e => setSelectedFamilyId(e.target.value)}
+                className="w-full p-2 border rounded-md bg-background"
+              >
+                <option value="">Selecionar família</option>
+                {families.map(fam => (
+                  <option key={fam.id} value={fam.id}>{fam.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label htmlFor="account">Conta Bancária</Label>
+            <select
+              id="account"
+              required
+              value={selectedAccountId}
+              onChange={e => setSelectedAccountId(e.target.value)}
+              className="w-full p-2 border rounded-md bg-background"
+            >
+              <option value="">Selecionar conta</option>
+              {accounts.map(acc => (
+                <option key={acc.id} value={acc.id}>{acc.nome}</option>
+              ))}
+            </select>
           </div>
 
           <DialogFooter>
@@ -338,13 +364,10 @@ export const TransactionForm = ({ open, onOpenChange, defaultType = 'despesa', o
             </Button>
             <Button
               type="submit"
-              disabled={loading || !formData.valor || (isFamily && (!familyId || familyIdLoading))}
+              disabled={loading || !formData.valor || (transactionType === 'familiar' && !selectedFamilyId) || !selectedAccountId}
             >
               {loading ? 'A guardar...' : 'Guardar'}
             </Button>
-            {isFamily && familyIdError && (
-              <div className="text-red-600 text-xs mt-2">{familyIdError}</div>
-            )}
           </DialogFooter>
         </form>
       </DialogContent>

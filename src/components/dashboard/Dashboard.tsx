@@ -420,15 +420,15 @@ export const Dashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ExpensesPieChart familyId={null} selectedMonth={selectedMonth} />
-        <SavingsProgressChart familyId={null} selectedMonth={selectedMonth} />
+        <ExpensesPieChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
+        <SavingsProgressChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
       </div>
 
       {/* Monthly Trend Chart */}
-      <MonthlyTrendChart familyId={null} selectedMonth={selectedMonth} />
+      <MonthlyTrendChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
 
       {/* Recent Transactions */}
-      <RecentTransactions familyId={null} />
+      <RecentTransactions familyId={null} accountId={selectedAccountId} />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

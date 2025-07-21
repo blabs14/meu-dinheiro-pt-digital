@@ -23,9 +23,10 @@ interface Transaction {
 
 export interface RecentTransactionsProps {
   familyId?: string;
+  accountId?: string;
 }
 
-export const RecentTransactions = ({ familyId }: RecentTransactionsProps) => {
+export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsProps) => {
   const { user } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,7 +38,7 @@ export const RecentTransactions = ({ familyId }: RecentTransactionsProps) => {
     } else {
       console.log('⚠️ [RecentTransactions] No user found');
     }
-  }, [user, familyId]);
+  }, [user, familyId, accountId]);
 
   const loadRecentTransactions = async () => {
     try {
@@ -45,6 +46,7 @@ export const RecentTransactions = ({ familyId }: RecentTransactionsProps) => {
       console.log('🔍 [RecentTransactions] Iniciando carregamento de transações');
       console.log('🔍 [RecentTransactions] User ID:', user?.id);
       console.log('🔍 [RecentTransactions] Family ID:', familyId);
+      console.log('🔍 [RecentTransactions] Account ID:', accountId);
 
       // Primeiro, verificar se conseguimos aceder à tabela
       const { count, error: countError } = await supabase
@@ -72,6 +74,10 @@ export const RecentTransactions = ({ familyId }: RecentTransactionsProps) => {
         `)
         .eq('user_id', user!.id)
         .order('data', { ascending: false });
+
+      if (accountId && accountId !== 'all') {
+        query = query.eq('account_id', accountId);
+      }
 
       // Se familyId for fornecido, mostrar apenas transações dessa família
       if (familyId) {
