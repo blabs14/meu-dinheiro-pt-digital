@@ -71,3 +71,40 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## Testes de Hooks com Supabase (Importante)
+
+### Limitação do Jest com ESM
+O ambiente de testes atual (Jest + ts-jest) **não suporta importar módulos ESM puros de node_modules**, como o Supabase e algumas das suas dependências. Isto significa que qualquer teste que tente importar o cliente real do Supabase irá falhar com erros de parsing (ex: `SyntaxError: Cannot use import statement outside a module`).
+
+### Padrão Obrigatório: Mock do Supabase
+**Todos os testes unitários de hooks que usam Supabase devem usar mocks para o cliente Supabase.**
+
+- Nunca importes o cliente real do Supabase em testes unitários.
+- Usa sempre o padrão:
+
+```ts
+jest.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: jest.fn(() => mockQuery),
+  },
+}));
+```
+
+- Garante que todos os métodos encadeados usados no hook (ex: `select`, `eq`, `is`, `order`, `update`, `delete`) estão mockados.
+- Testes de integração real só são possíveis em ambiente que suporte ESM nativamente (ex: Vitest, Jest ESM puro, Node).
+
+### Exemplo de mock robusto:
+
+```ts
+const mockQuery = {
+  select: jest.fn(function () { return this; }),
+  eq: jest.fn(function () { return this; }),
+  is: jest.fn(function () { return this; }),
+  order: jest.fn(async function () { return { data: [{ id: '1', nome: 'Meta Teste' }], error: null }; }),
+  update: jest.fn(async function () { return { data: { id: '1', nome: 'Meta Atualizada' }, error: null }; }),
+  delete: jest.fn(async function () { return { error: null }; }),
+};
+```
+
+Se precisares de testar integração real com Supabase, considera migrar para Vitest ou configurar Jest para ESM puro.

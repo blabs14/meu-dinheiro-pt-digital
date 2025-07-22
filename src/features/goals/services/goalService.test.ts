@@ -1,18 +1,20 @@
-const mockSelect = jest.fn(() => ({ data: [{ id: '1' }], error: null }));
-const mockInsert = jest.fn(() => ({ select: mockSelect }));
-const mockFrom = jest.fn(() => ({ insert: mockInsert }));
-
-import { createGoal } from './goalService';
-
-jest.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: mockFrom }
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({ data: [{ id: '1' }], error: null }))
+      }))
+    }))
+  }
 }));
+import goalService from './goalService';
 
 describe('goalService', () => {
   beforeEach(() => {
-    mockSelect.mockClear();
-    mockInsert.mockClear();
-    mockFrom.mockClear();
+    // mockSelect.mockClear(); // Removed as per new_code
+    // mockInsert.mockClear(); // Removed as per new_code
+    // mockFrom.mockClear(); // Removed as per new_code
   });
 
   it('valida corretamente um payload válido', async () => {
@@ -26,7 +28,7 @@ describe('goalService', () => {
       account_id: '33333333-3333-3333-3333-333333333333',
       family_id: null
     };
-    const result = await createGoal(validPayload);
+    const result = await goalService.createGoal(validPayload);
     expect(result.data).toBeDefined();
     expect(result.error).toBeNull();
   });
@@ -42,7 +44,7 @@ describe('goalService', () => {
       account_id: '33333333-3333-3333-3333-333333333333',
       family_id: null
     };
-    const result = await createGoal(invalidPayload);
+    const result = await goalService.createGoal(invalidPayload);
     expect(result.data).toBeNull();
     expect(result.error).toBeDefined();
     expect(result.error.message).toBe('Dados inválidos');

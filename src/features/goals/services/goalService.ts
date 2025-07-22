@@ -26,4 +26,12 @@ export const updateGoalProgress = async (goalId: string, valorAtual: number) => 
 
 export const deleteGoal = async (goalId: string) => {
   return await (supabase.from('goals') as any).delete().eq('id', goalId);
-}; 
+};
+
+const goalService = {
+  fetchGoals,
+  createGoal,
+  updateGoalProgress,
+  deleteGoal,
+};
+export default goalService; 

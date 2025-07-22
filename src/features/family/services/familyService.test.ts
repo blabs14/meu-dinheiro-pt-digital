@@ -1,18 +1,20 @@
-const mockSelect = jest.fn(() => ({ data: [{ id: '1' }], error: null }));
-const mockInsert = jest.fn(() => ({ select: mockSelect }));
-const mockFrom = jest.fn(() => ({ insert: mockInsert }));
-
-import { createFamily } from './familyService';
-
-jest.mock('@/integrations/supabase/client', () => ({
-  supabase: { from: mockFrom }
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: vi.fn(() => ({
+      insert: vi.fn(() => ({
+        select: vi.fn(() => ({ data: [{ id: '1' }], error: null }))
+      }))
+    }))
+  }
 }));
+import familyService from './familyService';
 
 describe('familyService', () => {
   beforeEach(() => {
-    mockSelect.mockClear();
-    mockInsert.mockClear();
-    mockFrom.mockClear();
+    // mockSelect.mockClear(); // This line is no longer needed as mockSelect is removed
+    // mockInsert.mockClear(); // This line is no longer needed as mockInsert is removed
+    // mockFrom.mockClear(); // This line is no longer needed as mockFrom is removed
   });
 
   it('valida corretamente um payload válido', async () => {
@@ -21,7 +23,7 @@ describe('familyService', () => {
       created_by: '11111111-1111-1111-1111-111111111111',
       description: 'Família para testes',
     };
-    const result = await createFamily(validPayload);
+    const result = await familyService.createFamily(validPayload);
     expect(result.data).toBeDefined();
     expect(result.error).toBeNull();
   });
@@ -32,7 +34,7 @@ describe('familyService', () => {
       created_by: '11111111-1111-1111-1111-111111111111',
       description: 'Família para testes',
     };
-    const result = await createFamily(invalidPayload);
+    const result = await familyService.createFamily(invalidPayload);
     expect(result.data).toBeNull();
     expect(result.error).toBeDefined();
     expect(result.error.message).toBe('Dados inválidos');

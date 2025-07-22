@@ -1,9 +1,26 @@
 import request from 'supertest';
-import app from '../../index';
+import { createApp } from '../../appFactory';
+import { createFamilyRoutes } from '../../features/family/routes/familyRoutes';
+import { makeFamilyService } from '../../features/family/services/familyService';
+import { makeJwtAuth } from '../../features/auth/middleware/jwtAuth';
+import { supabaseMock } from '../../../test-utils/supabaseMockUtil.js';
+import { Router } from 'express';
 
-let accessToken = '';
+let accessToken = 'validtoken';
 let testUserId = '11111111-1111-1111-1111-111111111111';
 let createdFamilyId = '';
+
+const familyService = makeFamilyService(supabaseMock);
+const jwtAuth = makeJwtAuth(supabaseMock);
+const familyRouter = createFamilyRoutes(familyService);
+
+// Router de autenticação mockado (mínimo)
+const mockAuthRouter = Router();
+mockAuthRouter.post('/signup', (req, res) => res.status(200).json({ success: true, data: { user: { id: testUserId, email: req.body.email } } }));
+mockAuthRouter.post('/login', (req, res) => res.status(200).json({ success: true, data: { access_token: accessToken, user: { id: testUserId } } }));
+
+const app = createApp({ authRoutes: mockAuthRouter });
+app.use('/family', jwtAuth, familyRouter);
 
 beforeAll(async () => {
   // Criar um email único para cada execução de teste

@@ -74,3 +74,12 @@ export const getSession = async () => {
 export const refreshSession = async (refreshToken: string) => {
   return await supabase.auth.refreshSession({ refresh_token: refreshToken });
 }; 
+
+const authService = {
+  signup,
+  login,
+  logout,
+  getSession,
+  refreshSession,
+};
+export default authService; 

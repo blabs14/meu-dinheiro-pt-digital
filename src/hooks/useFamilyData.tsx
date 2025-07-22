@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,21 +27,30 @@ export function useFamilyData() {
   const loadFamilyData = useCallback(async () => {
     if (!user) return;
     setLoading(true);
+    console.log('[useFamilyData] loadFamilyData chamado', { user });
     try {
-      // Exemplo: buscar família do utilizador
       const { data, error } = await supabase
         .from('families')
         .select('*')
         .eq('created_by', user.id)
         .single();
+      console.log('[useFamilyData] resultado do supabase', { data, error });
       if (error) throw error;
       setCurrentFamily(data as FamilyData);
+      console.log('[useFamilyData] setCurrentFamily', data);
     } catch (error) {
       toast({ title: 'Erro ao carregar família', description: String(error) });
+      console.log('[useFamilyData] erro', error);
     } finally {
       setLoading(false);
+      console.log('[useFamilyData] setLoading(false)');
     }
   }, [user, toast]);
+
+  useEffect(() => {
+    console.log('[useFamilyData] useEffect montou', { user });
+    loadFamilyData();
+  }, [loadFamilyData]);
 
   const updateFamily = useCallback(async (updates: Partial<FamilyData>) => {
     if (!user || !currentFamily) return;

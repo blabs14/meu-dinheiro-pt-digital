@@ -1,11 +1,18 @@
 import request from 'supertest';
-import app from '../../index';
+import { createApp } from '../../appFactory';
+import { createAuthRoutes } from '../../features/auth/routes/authRoutes';
+import { makeJwtAuth } from '../../features/auth/middleware/jwtAuth';
+import { supabaseMock } from '../../../test-utils/supabaseMockUtil.js';
 
 let testEmail = `testuser_${Date.now()}@example.com`;
 let testPassword = '123456';
 let testNome = 'Test User';
 let accessToken = '';
 let refreshToken = '';
+
+const authRouter = createAuthRoutes(supabaseMock);
+const jwtAuth = makeJwtAuth(supabaseMock);
+const app = createApp({ authRoutes: authRouter, jwtAuth });
 
 describe('Integração: /auth', () => {
   it('deve registar um utilizador válido', async () => {

@@ -111,4 +111,13 @@ export const autoSaveOnIncome = async (transaction: any, options?: { percent?: n
       family_id: transaction.family_id ?? null,
     });
   }
-}; 
+};
+
+const transactionService = {
+  fetchTransactions,
+  createTransaction,
+  classifyTransaction,
+  applySplit,
+  autoSaveOnIncome,
+};
+export default transactionService; 
