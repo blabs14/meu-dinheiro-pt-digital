@@ -1,13 +1,10 @@
-import { supabase } from '@/integrations/supabase/client';
 import { transactionSchema } from '../models/transactionSchema';
 
-export const fetchTransactions = async (filters: any) => {
-  // Exemplo: filters = { userId, familyId, accountId, month }
+export const fetchTransactions = async (supabase: any, filters: any) => {
   let query = supabase.from('transactions').select('*');
   if (filters.userId) query = query.eq('user_id', filters.userId);
   if (filters.familyId) query = query.eq('family_id', filters.familyId);
   if (filters.accountId && filters.accountId !== 'all') query = query.eq('account_id', filters.accountId);
-  // Filtro de mês
   if (filters.month && filters.month !== 'all') {
     const [year, month] = filters.month.split('-').map(Number);
     const start = `${year}-${String(month).padStart(2, '0')}-01`;
@@ -17,12 +14,11 @@ export const fetchTransactions = async (filters: any) => {
   return await query;
 };
 
-export const createTransaction = async (payload: any) => {
+export const createTransaction = async (supabase: any, payload: any) => {
   const parse = transactionSchema.safeParse(payload);
   if (!parse.success) {
     return { data: null, error: { message: 'Dados inválidos', details: parse.error.errors } };
   }
-  // Garantir que todos os campos obrigatórios estão presentes
   const tx = {
     user_id: parse.data.user_id,
     valor: parse.data.valor,
@@ -89,7 +85,7 @@ export const applySplit = (transaction: any, splitRules: any[]) => {
  * Permite configurar percentagem e conta de destino.
  * Garante que não duplica transações de poupança para a mesma receita.
  */
-export const autoSaveOnIncome = async (transaction: any, options?: { percent?: number, savingsAccountId?: string }) => {
+export const autoSaveOnIncome = async (supabase: any, transaction: any, options?: { percent?: number, savingsAccountId?: string }) => {
   if (transaction.tipo === 'receita' && transaction.valor > 0) {
     const percent = options?.percent ?? 10; // default 10%
     const savings = +(transaction.valor * (percent / 100)).toFixed(2);
@@ -113,11 +109,12 @@ export const autoSaveOnIncome = async (transaction: any, options?: { percent?: n
   }
 };
 
-const transactionService = {
-  fetchTransactions,
-  createTransaction,
-  classifyTransaction,
-  applySplit,
-  autoSaveOnIncome,
-};
-export default transactionService; 
+export function makeTransactionService(supabase: any) {
+  return {
+    fetchTransactions: (filters: any) => fetchTransactions(supabase, filters),
+    createTransaction: (payload: any) => createTransaction(supabase, payload),
+    classifyTransaction,
+    applySplit,
+    autoSaveOnIncome: (transaction: any, options?: any) => autoSaveOnIncome(supabase, transaction, options),
+  };
+} 
