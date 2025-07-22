@@ -1,3 +1,12 @@
+-- Função para atualizar o campo updated_at automaticamente
+CREATE OR REPLACE FUNCTION trigger_set_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 -- Criar tabela families
 CREATE TABLE families (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,

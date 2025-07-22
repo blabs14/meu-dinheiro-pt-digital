@@ -8,9 +8,20 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Detectar ambiente Node/teste e usar storage em memória
+class MemoryStorage {
+  private store: Record<string, string> = {};
+  getItem(key: string) { return this.store[key] ?? null; }
+  setItem(key: string, value: string) { this.store[key] = value; }
+  removeItem(key: string) { delete this.store[key]; }
+}
+
+const isNode = typeof window === 'undefined' || process.env.NODE_ENV === 'test';
+const storage = isNode ? new MemoryStorage() : localStorage;
+
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
+    storage,
     persistSession: true,
     autoRefreshToken: true,
   }

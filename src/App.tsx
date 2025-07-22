@@ -67,11 +67,16 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
+console.log("React está a arrancar!");
+
 function App() {
   return (
-    <ErrorBoundary>
-      <AppContent />
-    </ErrorBoundary>
+    <div>
+      <h1 style={{color: 'green', textAlign: 'center'}}>Teste rápido: React está a funcionar!</h1>
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
+    </div>
   );
 }
 
