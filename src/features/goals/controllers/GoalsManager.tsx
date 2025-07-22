@@ -9,14 +9,17 @@ import { GoalForm } from './GoalForm';
 import { GoalCard } from './GoalCard';
 import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { useGoalsData } from '@/hooks/useGoalsData';
+import { makeGoalService } from '../services/goalService';
 
 interface Goal {
   id: string;
   nome: string;
   valor_objetivo: number; // Corrigido: usar valor_objetivo
   valor_atual: number;
+  valor_meta?: number | null;
   prazo: string | null;
   created_at: string;
+  family_id?: string | null;
 }
 
 interface GoalsManagerProps {
@@ -27,14 +30,14 @@ interface GoalsManagerProps {
 export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  // Substituir estados e funções de metas pelo hook
+  const goalService = makeGoalService(supabase);
   const {
     goals,
     loading,
     loadGoals,
     deleteGoal,
     updateGoalAmount,
-  } = useGoalsData(user?.id ?? null, familyId);
+  } = useGoalsData(user?.id ?? null, familyId, goalService);
   const [formOpen, setFormOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
@@ -44,21 +47,10 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
     }
   }, [user, refreshTrigger]);
 
+  // Refatorar handlers para usar apenas o hook
   const handleDelete = async (goalId: string) => {
     try {
-      const { error } = await supabase
-        .from('goals')
-        .delete()
-        .eq('id', goalId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Sucesso",
-        description: "Meta eliminada com sucesso",
-      });
-
-      loadGoals();
+      await deleteGoal(goalId);
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -70,34 +62,11 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
 
   const handleUpdateAmount = async (goalId: string, newAmount: number) => {
     try {
-      const { error } = await supabase
-        .from('goals')
-        .update({ valor_atual: newAmount })
-        .eq('id', goalId);
-
-      if (error) throw error;
-
-      // Check if goal was completed
-      const goal = goals.find(g => g.id === goalId);
-      if (goal && newAmount >= goal.valor_objetivo && goal.valor_atual < goal.valor_objetivo) {
-        toast({
-          title: "🎉 Parabéns!",
-          description: `Meta "${goal.nome}" foi atingida!`,
-        });
-      } else {
-        toast({
-          title: "Sucesso",
-          description: "Valor atualizado com sucesso",
-        });
-      }
-
-      loadGoals();
-    } catch (error) {
-      console.error('❌ [GoalsManager] Erro ao atualizar valor:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Erro ao atualizar valor';
+      await updateGoalAmount(goalId, newAmount);
+    } catch (error: any) {
       toast({
         title: "Erro",
-        description: errorMessage,
+        description: error.message || "Erro ao atualizar valor",
         variant: "destructive"
       });
     }
@@ -231,7 +200,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
             {goals.map((goal) => (
               <GoalCard
                 key={goal.id}
-                goal={goal}
+                goal={{ ...goal, valor_meta: goal.valor_meta ?? null }}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdateAmount={handleUpdateAmount}

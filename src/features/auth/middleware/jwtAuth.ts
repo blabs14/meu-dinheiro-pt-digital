@@ -6,7 +6,6 @@ export function makeJwtAuth(supabase) {
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       const err: any = new Error('Token não fornecido');
       err.status = 401;
-      console.log('[JWT MIDDLEWARE]', req.method, req.originalUrl, 'erro:', err && err.message);
       next(err);
       return;
     }
@@ -16,7 +15,6 @@ export function makeJwtAuth(supabase) {
       if (error || !data?.user) {
         const err: any = new Error(error?.message || 'Token inválido ou expirado');
         err.status = 401;
-        console.log('[JWT MIDDLEWARE]', req.method, req.originalUrl, 'erro:', err && err.message);
         next(err);
         return;
       }
@@ -24,7 +22,6 @@ export function makeJwtAuth(supabase) {
       next();
     } catch (err: any) {
       err.status = 401;
-      console.log('[JWT MIDDLEWARE]', req.method, req.originalUrl, 'erro:', err && err.message);
       next(err);
       return;
     }

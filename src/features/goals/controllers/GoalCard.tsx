@@ -15,6 +15,7 @@ interface Goal {
   valor_atual: number;
   prazo: string | null;
   created_at: string;
+  valor_meta?: number | null;
 }
 
 interface GoalCardProps {

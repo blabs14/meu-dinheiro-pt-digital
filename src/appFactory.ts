@@ -16,16 +16,36 @@ export function createApp({ authRoutes: injectedAuthRoutes, jwtAuth: injectedJwt
 
   Sentry.init({ dsn: process.env.SENTRY_DSN });
   app.use(Sentry.Handlers.requestHandler());
+  // CORS robusto: origens configuráveis por env, headers extra
+  const allowedOrigins = (process.env.CORS_ORIGINS || 'https://teu-dominio.pt,http://localhost:3000').split(',');
   app.use(cors({
-    origin: ['https://teu-dominio.pt', 'http://localhost:3000'],
-    credentials: true
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('CORS não permitido para esta origem.'));
+      }
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+    exposedHeaders: ['ETag', 'X-RateLimit-Limit', 'X-RateLimit-Remaining'],
   }));
-  app.use(helmet());
+  // Helmet com opções extra para headers de segurança
+  app.use(helmet({
+    contentSecurityPolicy: false, // Ajustar conforme necessário
+    crossOriginResourcePolicy: { policy: 'same-origin' },
+    referrerPolicy: { policy: 'no-referrer' },
+    frameguard: { action: 'deny' },
+    hsts: { maxAge: 31536000, includeSubDomains: true },
+  }));
+  // Rate limiting mais restrito para produção
   const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
+    windowMs: 10 * 60 * 1000, // 10 minutos
+    max: process.env.NODE_ENV === 'production' ? 50 : 100,
     standardHeaders: true,
     legacyHeaders: false,
+    message: 'Demasiados pedidos. Tente novamente mais tarde.'
   });
   app.use(limiter);
   app.use(requestLogger);

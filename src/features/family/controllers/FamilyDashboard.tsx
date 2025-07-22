@@ -15,6 +15,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useFamilyStats } from '@/hooks/useFamilyStats';
+import { useFamilyMembers } from '@/hooks/useFamilyMembers';
+import { FamilyMembersList } from '../components/FamilyMembersList';
+import { makeFamilyService } from '../services/familyService';
 
 export const FamilyDashboard = () => {
   const { user } = useAuth();
@@ -25,13 +29,10 @@ export const FamilyDashboard = () => {
   const [currentFamily, setCurrentFamily] = useState<any>(null);
   const [familyMembers, setFamilyMembers] = useState<any[]>([]);
   const [userRole, setUserRole] = useState<string>('member');
-  const [stats, setStats] = useState({
-    totalIncome: 0,
-    totalExpenses: 0,
-    savingsRate: 0,
-    memberCount: 0,
-    activeGoals: 0
-  });
+  // Substituir stats por hook
+  const { totalIncome, totalExpenses, savingsRate, activeGoals, loading: statsLoading, error: statsError, refresh: refreshStats } = useFamilyStats(currentFamily?.id ?? null);
+  const familyService = makeFamilyService(supabase);
+  const { familyMembers: members, loading: loadingMembers, loadFamilyMembers, removeMember, updateMemberRole } = useFamilyMembers(currentFamily?.id ?? null, familyService);
 
   useEffect(() => {
     if (user) {
@@ -43,6 +44,7 @@ export const FamilyDashboard = () => {
     setRefreshing(true);
     try {
       await loadFamilyData();
+      await refreshStats();
       toast({
         title: "Dados Atualizados",
         description: "As informações da família foram recarregadas.",
@@ -91,7 +93,7 @@ export const FamilyDashboard = () => {
           
           // Carregar dados adicionais
           await loadFamilyMembers(family.id);
-          await loadFamilyStats(family.id); // Carregar estatísticas
+          await refreshStats(); // Carregar estatísticas
         } else {
           console.warn('⚠️ FamilyDashboard - Estrutura de dados inválida:', familyResponse);
           setCurrentFamily(null);
@@ -126,78 +128,9 @@ export const FamilyDashboard = () => {
 
       if (Array.isArray(membersData)) {
         setFamilyMembers(membersData);
-        setStats(prev => ({ ...prev, memberCount: membersData.length }));
       }
     } catch (error) {
       console.error('❌ Erro ao carregar membros:', error);
-    }
-  };
-
-  const loadFamilyStats = async (familyId: string) => {
-    try {
-      console.log('🔍 [FamilyDashboard] Carregando estatísticas para família:', familyId);
-      
-      const currentMonth = new Date().toISOString().slice(0, 7);
-      
-      // Carregar transações da família do mês atual
-      const { data: transactions, error: transactionsError } = await supabase
-        .from('transactions')
-        .select('valor, tipo')
-        .eq('family_id', familyId)
-        .gte('data', `${currentMonth}-01`)
-        .lt('data', `${new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString().slice(0, 10)}`);
-
-      if (transactionsError) {
-        console.error('❌ [FamilyDashboard] Erro ao carregar transações:', transactionsError);
-        throw transactionsError;
-      }
-
-      // Calcular totais
-      const income = transactions
-        ?.filter(t => t.tipo === 'receita')
-        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-        
-      const expenses = transactions
-        ?.filter(t => t.tipo === 'despesa')
-        .reduce((sum, t) => sum + Number(t.valor), 0) || 0;
-
-      // Calcular taxa de poupança
-      const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
-
-      // Carregar número de metas da família
-      const { data: goals, error: goalsError } = await supabase
-        .from('goals')
-        .select('id')
-        .eq('family_id', familyId);
-
-      if (goalsError) {
-        console.error('❌ [FamilyDashboard] Erro ao carregar metas:', goalsError);
-      }
-
-      const newStats = {
-        totalIncome: income,
-        totalExpenses: expenses,
-        savingsRate,
-        activeGoals: goals?.length || 0
-      };
-
-      setStats(prev => ({
-        ...prev,
-        ...newStats
-      }));
-
-      console.log('🔍 [FamilyDashboard] Estatísticas atualizadas:', newStats);
-
-    } catch (error) {
-      console.error('❌ [FamilyDashboard] Erro ao carregar estatísticas da família:', error);
-      // Definir valores padrão em caso de erro
-      setStats(prev => ({
-        ...prev,
-        totalIncome: 0,
-        totalExpenses: 0,
-        savingsRate: 0,
-        activeGoals: 0
-      }));
     }
   };
 
@@ -266,7 +199,7 @@ export const FamilyDashboard = () => {
             {currentFamily.nome}
           </h1>
           <p className="text-muted-foreground mt-1">
-            Dashboard da família • {stats.memberCount} membros • Você é {getRoleLabel(userRole)}
+            Dashboard da família • {familyMembers.length} membros • Você é {getRoleLabel(userRole)}
           </p>
         </div>
         <div className="flex gap-2">
@@ -300,7 +233,7 @@ export const FamilyDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-green-600">
-              {formatCurrency(stats.totalIncome)}
+              {formatCurrency(totalIncome)}
             </div>
             <p className="text-xs text-muted-foreground">Este mês</p>
           </CardContent>
@@ -313,7 +246,7 @@ export const FamilyDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-red-600">
-              {formatCurrency(stats.totalExpenses)}
+              {formatCurrency(totalExpenses)}
             </div>
             <p className="text-xs text-muted-foreground">Este mês</p>
           </CardContent>
@@ -326,10 +259,10 @@ export const FamilyDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-blue-600">
-              {stats.savingsRate.toFixed(1)}%
+              {savingsRate.toFixed(1)}%
             </div>
             <p className="text-xs text-muted-foreground">
-              {formatCurrency(stats.totalIncome - stats.totalExpenses)}
+              {formatCurrency(totalIncome - totalExpenses)}
             </p>
           </CardContent>
         </Card>
@@ -341,10 +274,10 @@ export const FamilyDashboard = () => {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-purple-600">
-              {stats.activeGoals}
+              {activeGoals}
             </div>
             <p className="text-xs text-muted-foreground">
-              {stats.memberCount} membros
+              {familyMembers.length} membros
             </p>
           </CardContent>
         </Card>
@@ -362,24 +295,12 @@ export const FamilyDashboard = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {familyMembers.map((member: any) => (
-              <div key={member.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
-                  {member.profiles?.nome?.charAt(0).toUpperCase() || 'U'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium truncate">{member.profiles?.nome || 'Utilizador'}</p>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {member.profiles?.email}
-                  </p>
-                </div>
-                <Badge variant={getRoleBadgeVariant(member.role) as any}>
-                  {getRoleLabel(member.role)}
-                </Badge>
-              </div>
-            ))}
-          </div>
+          <FamilyMembersList
+            members={familyMembers}
+            loading={loadingMembers}
+            onRemove={removeMember}
+            onUpdateRole={updateMemberRole}
+          />
         </CardContent>
       </Card>
 

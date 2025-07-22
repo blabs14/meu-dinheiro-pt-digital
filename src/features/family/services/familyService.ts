@@ -39,6 +39,22 @@ export const fetchFamilyById = async (supabase: any, id: string) => {
   return { data, error };
 };
 
+export const fetchFamilyMembers = async (supabase: any, familyId: string) => {
+  // Tentar função SQL primeiro
+  const { data: membersData, error: membersError } = await supabase.rpc('get_family_members_with_profiles', { p_family_id: familyId });
+  if (!membersError && Array.isArray(membersData)) {
+    return { data: membersData, error: null };
+  }
+  // Fallback: Query direta
+  const { data: directMembers, error: directError } = await supabase.from('family_members').select('*').eq('family_id', familyId);
+  if (directError) return { data: null, error: directError };
+  return { data: directMembers, error: null };
+};
+
+export const updateMemberRole = async (supabase: any, familyId: string, memberId: string, newRole: 'admin' | 'member' | 'viewer') => {
+  return await supabase.from('family_members').update({ role: newRole }).eq('id', memberId).eq('family_id', familyId);
+};
+
 export function makeFamilyService(supabase: any) {
   return {
     fetchFamilies: (userId: string) => fetchFamilies(supabase, userId),
@@ -48,5 +64,7 @@ export function makeFamilyService(supabase: any) {
     removeMember: (familyId: string, userId: string) => removeMember(supabase, familyId, userId),
     transferOwnership: (familyId: string, newOwnerId: string) => transferOwnership(supabase, familyId, newOwnerId),
     fetchFamilyById: (id: string) => fetchFamilyById(supabase, id),
+    fetchFamilyMembers: (familyId: string) => fetchFamilyMembers(supabase, familyId),
+    updateMemberRole: (familyId: string, memberId: string, newRole: 'admin' | 'member' | 'viewer') => updateMemberRole(supabase, familyId, memberId, newRole),
   };
 } 
