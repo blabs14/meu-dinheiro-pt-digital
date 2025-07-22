@@ -7,13 +7,15 @@ import dotenv from 'dotenv';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Carregar variáveis de ambiente
+// Carregar variáveis de ambiente apenas fora de CI
 const envLocal = path.join(__dirname, '../.env.local');
 const envTest = path.join(__dirname, '../.env.test');
-if (fs.existsSync(envLocal)) {
-  dotenv.config({ path: envLocal });
-} else if (fs.existsSync(envTest)) {
-  dotenv.config({ path: envTest });
+if (!process.env.CI) {
+  if (fs.existsSync(envLocal)) {
+    dotenv.config({ path: envLocal });
+  } else if (fs.existsSync(envTest)) {
+    dotenv.config({ path: envTest });
+  }
 }
 
 const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
