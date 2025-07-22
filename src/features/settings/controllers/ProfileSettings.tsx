@@ -9,6 +9,7 @@ import { Separator } from '@/components/ui/separator';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { User, Mail, Lock, Trash2, Eye, EyeOff, Save } from 'lucide-react';
+import { useSettingsData } from '@/hooks/useSettingsData';
 
 interface ProfileData {
   nome: string;
@@ -20,18 +21,17 @@ interface ProfileData {
 export const ProfileSettings = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
-  const [passwordLoading, setPasswordLoading] = useState(false);
+  // Substituir estados e funções de perfil pelo hook
+  const {
+    profileData,
+    setProfileData,
+    loading,
+    passwordLoading,
+    loadProfile,
+    updateProfile,
+  } = useSettingsData(user);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
-
-  const [profileData, setProfileData] = useState<ProfileData>({
-    nome: '',
-    email: user?.email || '',
-    percentual_divisao: 50,
-    poupanca_mensal: 20
-  });
-
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -43,79 +43,6 @@ export const ProfileSettings = () => {
       loadProfile();
     }
   }, [user]);
-
-  const loadProfile = async () => {
-    if (!user) return;
-
-    try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('nome, percentual_divisao, poupanca_mensal')
-        .eq('user_id', user.id)
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (profile) {
-        setProfileData({
-          nome: profile.nome || '',
-          email: user.email || '',
-          percentual_divisao: profile.percentual_divisao || 50,
-          poupanca_mensal: profile.poupanca_mensal || 20
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar perfil",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleProfileUpdate = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      // Atualizar metadados do auth se o nome mudou
-      if (profileData.nome !== user.user_metadata?.nome) {
-        const { error: authError } = await supabase.auth.updateUser({
-          data: { nome: profileData.nome }
-        });
-
-        if (authError) throw authError;
-      }
-
-      // Atualizar perfil na base de dados
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          nome: profileData.nome,
-          percentual_divisao: profileData.percentual_divisao,
-          poupanca_mensal: profileData.poupanca_mensal
-        });
-
-      if (profileError) throw profileError;
-
-      toast({
-        title: "Sucesso",
-        description: "Perfil atualizado com sucesso",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao atualizar perfil",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handlePasswordChange = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
@@ -136,7 +63,6 @@ export const ProfileSettings = () => {
       return;
     }
 
-    setPasswordLoading(true);
     try {
       const { error } = await supabase.auth.updateUser({
         password: passwordData.newPassword
@@ -163,7 +89,7 @@ export const ProfileSettings = () => {
         variant: "destructive"
       });
     } finally {
-      setPasswordLoading(false);
+      // setPasswordLoading(false); // Removido conforme instrução
     }
   };
 
@@ -279,7 +205,7 @@ export const ProfileSettings = () => {
             </div>
           </div>
 
-          <Button onClick={handleProfileUpdate} disabled={loading} className="w-full md:w-auto">
+          <Button onClick={() => updateProfile(profileData)} disabled={loading} className="w-full md:w-auto">
             <Save className="h-4 w-4 mr-2" />
             {loading ? 'A guardar...' : 'Guardar Alterações'}
           </Button>

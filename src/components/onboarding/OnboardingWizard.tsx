@@ -24,6 +24,7 @@ import {
   Plane,
   GraduationCap
 } from 'lucide-react';
+import { useOnboardingData } from '@/hooks/useOnboardingData';
 
 interface OnboardingStep {
   id: string;
@@ -39,21 +40,20 @@ interface OnboardingWizardProps {
 export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [currentStep, setCurrentStep] = useState(0);
-  const [loading, setLoading] = useState(false);
-
-  // Dados do formulário
-  const [profileData, setProfileData] = useState({
-    nome: user?.user_metadata?.nome || '',
-    percentual_divisao: 50,
-    poupanca_mensal: 20
-  });
-
-  const [selectedGoals, setSelectedGoals] = useState<string[]>([]);
-  const [customGoal, setCustomGoal] = useState({
-    nome: '',
-    valor_meta: ''
-  });
+  // Substituir estados e funções de onboarding pelo hook
+  const {
+    currentStep,
+    setCurrentStep,
+    loading,
+    profileData,
+    setProfileData,
+    selectedGoals,
+    setSelectedGoals,
+    customGoal,
+    setCustomGoal,
+    handleNext,
+    handlePrevious,
+  } = useOnboardingData(user, onComplete);
 
   const steps: OnboardingStep[] = [
     {
@@ -100,104 +100,6 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
       style: 'currency',
       currency: 'EUR'
     }).format(value);
-  };
-
-  const handleNext = async () => {
-    if (currentStep === steps.length - 2) {
-      // Último passo antes da conclusão - salvar tudo
-      await saveOnboardingData();
-    } else if (currentStep < steps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const handlePrevious = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const saveOnboardingData = async () => {
-    if (!user) return;
-
-    setLoading(true);
-    try {
-      // 1. Criar/atualizar perfil
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .upsert({
-          user_id: user.id,
-          nome: profileData.nome,
-          percentual_divisao: profileData.percentual_divisao,
-          poupanca_mensal: profileData.poupanca_mensal
-        });
-
-      if (profileError) throw profileError;
-
-      // 2. Criar metas selecionadas
-      const goalsToCreate = [];
-      
-      // Metas predefinidas
-      selectedGoals.forEach(goalId => {
-        const goal = predefinedGoals.find(g => g.id === goalId);
-        if (goal) {
-          goalsToCreate.push({
-            user_id: user.id,
-            nome: goal.name,
-            valor_meta: goal.amount,
-            valor_atual: 0
-          });
-        }
-      });
-
-      // Meta personalizada
-      if (customGoal.nome && customGoal.valor_meta) {
-        goalsToCreate.push({
-          user_id: user.id,
-          nome: customGoal.nome,
-          valor_meta: parseFloat(customGoal.valor_meta),
-          valor_atual: 0
-        });
-      }
-
-      if (goalsToCreate.length > 0) {
-        const { error: goalsError } = await supabase
-          .from('goals')
-          .insert(goalsToCreate);
-
-        if (goalsError) throw goalsError;
-      }
-
-      // 3. Criar transação de exemplo (opcional)
-      const { error: transactionError } = await supabase
-        .from('transactions')
-        .insert({
-          user_id: user.id,
-          valor: 0.01,
-          data: new Date().toISOString().split('T')[0],
-          tipo: 'receita',
-          modo: 'pessoal',
-          descricao: 'Transação de boas-vindas! 🎉'
-        });
-
-      // Não falhar se a transação não for criada
-
-      setCurrentStep(currentStep + 1);
-
-      toast({
-        title: "🎉 Conta configurada!",
-        description: "Bem-vindo ao Meu Dinheiro! Está tudo pronto para começar.",
-      });
-
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao configurar conta",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
   };
 
   const toggleGoal = (goalId: string) => {

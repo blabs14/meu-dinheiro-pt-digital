@@ -7,6 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useTransactionsData } from '@/hooks/useTransactionsData';
 
 interface Transaction {
   id: string;
@@ -27,8 +28,12 @@ export interface RecentTransactionsProps {
 
 export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsProps) => {
   const { user } = useAuth();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Substituir estados e funções de transações pelo hook
+  const {
+    transactions,
+    loading,
+    loadRecentTransactions,
+  } = useTransactionsData(user?.id ?? null, familyId, accountId);
 
   useEffect(() => {
     if (user) {
@@ -38,86 +43,6 @@ export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsPr
       console.log('⚠️ [RecentTransactions] No user found');
     }
   }, [user, familyId, accountId]);
-
-  const loadRecentTransactions = async () => {
-    try {
-      setLoading(true);
-      console.log('🔍 [RecentTransactions] Iniciando carregamento de transações');
-      console.log('🔍 [RecentTransactions] User ID:', user?.id);
-      console.log('🔍 [RecentTransactions] Family ID:', familyId);
-      console.log('🔍 [RecentTransactions] Account ID:', accountId);
-
-      // Primeiro, verificar se conseguimos aceder à tabela
-      const { count, error: countError } = await supabase
-        .from('transactions')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', user!.id);
-
-      console.log('🔍 [RecentTransactions] Total de transações do utilizador:', count);
-      console.log('🔍 [RecentTransactions] Erro ao contar:', countError);
-
-      let query = supabase.from('transactions').select(`
-          id,
-          valor,
-          data,
-          tipo,
-          descricao,
-          family_id,
-          user_id,
-          created_at,
-          categories:categoria_id (
-            nome,
-            cor
-          )
-        `)
-        .eq('user_id', user!.id)
-        .order('data', { ascending: false });
-
-      if (accountId && accountId !== 'all') {
-        query = query.eq('account_id', accountId);
-      }
-
-      // Se familyId for fornecido, mostrar apenas transações dessa família
-      if (familyId) {
-        console.log('🔍 [RecentTransactions] Filtrando por família:', familyId);
-        query = query.eq('family_id', familyId);
-      } else {
-        // Se não for fornecido, mostrar apenas transações pessoais (family_id IS NULL)
-        console.log('🔍 [RecentTransactions] Filtrando transações pessoais (family_id IS NULL)');
-        query = query.is('family_id', null);
-      }
-
-      console.log('🔍 [RecentTransactions] Executando query...');
-
-      const { data, error } = await query.limit(10);
-
-      console.log('🔍 [RecentTransactions] Resultado da query:', data);
-      console.log('🔍 [RecentTransactions] Erro da query:', error);
-      console.log('🔍 [RecentTransactions] Número de transações retornadas:', data?.length || 0);
-
-      if (error) {
-        console.error('❌ [RecentTransactions] Erro detalhado:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        throw error;
-      }
-      
-      console.log('✅ [RecentTransactions] Transações carregadas:', data?.length || 0);
-      if (data && data.length > 0) {
-        console.log('🔍 [RecentTransactions] Primeira transação:', data[0]);
-      }
-      
-      setTransactions(data || []);
-    } catch (error) {
-      console.error('❌ [RecentTransactions] Erro ao carregar transações:', error);
-      setTransactions([]);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {

@@ -28,6 +28,9 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { useFamilyData } from '@/hooks/useFamilyData';
+import { useFamilyMembers } from '@/hooks/useFamilyMembers';
+import { useFamilyInvites } from '@/hooks/useFamilyInvites';
 
 interface FamilyMember {
   id: string;
@@ -70,10 +73,35 @@ interface FamilyData {
 export const FamilyManager = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [currentFamily, setCurrentFamily] = useState<FamilyData | null>(null);
-  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
-  const [pendingInvites, setPendingInvites] = useState<FamilyInvite[]>([]);
+  // Substituir estados e funções de dados da família pelo hook
+  const {
+    loading,
+    currentFamily,
+    loadFamilyData,
+    updateFamily,
+    deleteFamily,
+    handleRefresh,
+    refreshing,
+  } = useFamilyData();
+  // Substituir estados e funções de membros pelo hook
+  const {
+    familyMembers,
+    loadingMembers,
+    loadFamilyMembers,
+    removeMember,
+    updateMemberRole,
+  } = useFamilyMembers(currentFamily?.id ?? null);
+  // Substituir estados e funções de convites pelo hook
+  const {
+    pendingInvites,
+    loadingInvites,
+    loadFamilyInvites,
+    loadUserPendingInvites,
+    inviteMember,
+    acceptInvite,
+    declineInvite,
+    cancelInvite,
+  } = useFamilyInvites(currentFamily?.id ?? null, user?.email ?? null);
   const [userRole, setUserRole] = useState<string>('member');
 
   // States para formulários
@@ -86,7 +114,8 @@ export const FamilyManager = () => {
   // Adicionar ao início do componente, após os outros states
   const [pendingInvitesForUser, setPendingInvitesForUser] = useState<FamilyInvite[]>([]);
   const [showDeleteFamily, setShowDeleteFamily] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
+  // Remover duplicação de refreshing
+  // const [refreshing, setRefreshing] = useState(false); // já vem do hook
 
   useEffect(() => {
     if (user) {
@@ -96,8 +125,8 @@ export const FamilyManager = () => {
   }, [user]);
 
   // Função para refresh manual
-  const handleRefresh = async () => {
-    setRefreshing(true);
+  const handleRefreshManual = async () => {
+    // setRefreshing(true); // já vem do hook
     try {
       await Promise.all([
         loadFamilyData(),
@@ -110,203 +139,14 @@ export const FamilyManager = () => {
     } catch (error) {
       console.error('Erro no refresh:', error);
     } finally {
-      setRefreshing(false);
+      // setRefreshing(false); // já vem do hook
     }
   };
 
-  const loadFamilyData = async () => {
-    if (!user) return;
+  // Remover duplicação de loadFamilyMembers
+  // const loadFamilyMembers = async (familyId: string) => { ... } // já vem do hook
 
-    try {
-      setLoading(true);
-
-      // Primeiro tentar usar função SQL nativa
-      const { data: familyData, error: familyError } = await supabase
-        .rpc('get_user_family_data', { p_user_id: user.id });
-
-      if (familyError) {
-        console.warn('⚠️ Função SQL falhou, usando query direta:', familyError);
-        
-        // Fallback: Query direta
-        const { data: memberData, error: memberError } = await supabase
-          .from('family_members')
-          .select(`
-            family_id,
-            role,
-            families!inner (
-              id,
-              nome,
-              description,
-              created_by,
-              created_at,
-              updated_at,
-              settings
-            )
-          `)
-          .eq('user_id', user.id)
-          .limit(1);
-
-        if (memberError) throw memberError;
-
-        if (memberData && memberData.length > 0) {
-          const member = memberData[0];
-          setCurrentFamily(member.families as FamilyData);
-          setUserRole(member.role);
-        } else {
-          setCurrentFamily(null);
-          setUserRole('member');
-        }
-      } else if (familyData && Array.isArray(familyData) && familyData.length > 0) {
-        const familyResponse = familyData[0] as unknown as {
-          family: FamilyData;
-          family_member: FamilyMember;
-        };
-        console.log('🔍 Debug - Resposta da função:', familyResponse);
-        
-        if (familyResponse.family && familyResponse.family_member) {
-          const family = familyResponse.family;
-          const member = familyResponse.family_member;
-          
-          console.log('🔍 FamilyManager - Dados encontrados:', { family, member });
-          
-          setCurrentFamily({
-            id: family.id,
-            nome: family.nome,
-            description: family.description,
-            created_by: family.created_by,
-            created_at: family.created_at,
-            updated_at: family.updated_at,
-            settings: family.settings || {
-              allow_view_all: true,
-              allow_add_transactions: true,
-              require_approval: false
-            }
-          });
-          setUserRole(member.role);
-          
-          console.log('✅ FamilyManager - Família definida:', family.nome);
-          
-          // Carregar membros da família
-          await loadFamilyMembers(family.id);
-        } else {
-          setCurrentFamily(null);
-          setUserRole('member');
-        }
-      } else {
-        setCurrentFamily(null);
-        setUserRole('member');
-      }
-    } catch (error: unknown) {
-      console.error('❌ Erro ao carregar dados da família:', error);
-      // Não mostrar toast de erro aqui para evitar spam
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadFamilyMembers = async (familyId: string) => {
-    try {
-      // Tentar função SQL primeiro
-      const { data: membersData, error: membersError } = await supabase
-        .rpc('get_family_members_with_profiles', { p_family_id: familyId });
-
-      if (membersError) {
-        console.warn('⚠️ Função SQL para membros falhou, usando query direta:', membersError);
-        
-        // Fallback: Query direta simples sem relacionamentos
-        const { data: directMembers, error: directError } = await supabase
-          .from('family_members')
-          .select('*')
-          .eq('family_id', familyId);
-
-        if (directError) throw directError;
-        
-        // Mapear para o formato esperado
-        const processedMembers = (directMembers || []).map((member: any) => ({
-          ...member,
-          role: member.role as 'owner' | 'admin' | 'member' | 'viewer',
-          profiles: { nome: 'Utilizador', email: '' }
-        }));
-        
-        setFamilyMembers(processedMembers);
-      } else if (Array.isArray(membersData)) {
-        const processedMembers = membersData.map((member: any) => ({
-          ...member,
-          role: member.role as 'owner' | 'admin' | 'member' | 'viewer',
-          profiles: member.profiles || { nome: 'Utilizador', email: '' }
-        }));
-        setFamilyMembers(processedMembers);
-      }
-
-      // Carregar convites pendentes
-      const { data: invites, error: invitesError } = await supabase
-        .from('family_invites')
-        .select('*')
-        .eq('family_id', familyId)
-        .eq('status', 'pending')
-        .gte('expires_at', new Date().toISOString());
-
-      if (invitesError) throw invitesError;
-      
-      const processedInvites = (invites || []).map((invite: any) => ({
-        ...invite,
-        status: invite.status as 'pending' | 'accepted' | 'declined'
-      }));
-      
-      setPendingInvites(processedInvites);
-
-    } catch (error) {
-      console.error('❌ Erro ao carregar membros:', error);
-    }
-  };
-
-  const loadUserPendingInvites = async () => {
-    if (!user?.email) return;
-
-    try {
-      console.log('🔍 Debug - Carregando convites para email:', user.email);
-      
-      const { data: invites, error } = await supabase
-        .from('family_invites')
-        .select('*')
-        .eq('email', user.email.toLowerCase())
-        .eq('status', 'pending')
-        .gte('expires_at', new Date().toISOString())
-        .order('created_at', { ascending: false });
-
-      console.log('🔍 Debug - Resultado da query:', { invites, error });
-
-      if (error) {
-        console.error('❌ Erro na query:', error);
-        throw error;
-      }
-      
-      const processedInvites = (invites || []).map(invite => ({
-        ...invite,
-        status: invite.status as 'pending' | 'accepted' | 'declined'
-      }));
-      
-      console.log('🔍 Debug - Convites processados:', processedInvites);
-      
-      setPendingInvitesForUser(processedInvites);
-      
-      // Mostrar notificação se encontrar convites
-      if (processedInvites.length > 0) {
-        toast({
-          title: `${processedInvites.length} convite(s) pendente(s)`,
-          description: "Tem convites para participar em famílias",
-        });
-      }
-      
-    } catch (error) {
-      console.error('❌ Erro ao carregar convites do utilizador:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar convites pendentes",
-        variant: "destructive"
-      });
-    }
-  };
+  // Remover funções e estados duplicados relacionados com convites
 
   const createFamily = async () => {
     if (!user || !familyName.trim()) return;
@@ -343,283 +183,6 @@ export const FamilyManager = () => {
       });
     } finally {
       setCreateLoading(false);
-    }
-  };
-
-  const inviteMember = async () => {
-    if (!user || !currentFamily || !inviteEmail.trim()) return;
-
-    setInviteLoading(true);
-    try {
-      const emailToInvite = inviteEmail.trim().toLowerCase();
-
-      // Verificar se já existe um convite pendente para este email
-      const { data: existingInvite, error: inviteCheckError } = await supabase
-        .from('family_invites')
-        .select('id')
-        .eq('family_id', currentFamily.id)
-        .eq('email', emailToInvite)
-        .eq('status', 'pending')
-        .gte('expires_at', new Date().toISOString());
-
-      if (inviteCheckError && inviteCheckError.code !== 'PGRST116') {
-        throw inviteCheckError;
-      }
-
-      if (existingInvite && existingInvite.length > 0) {
-        toast({
-          title: "Convite Já Existe",
-          description: "Já existe um convite pendente para este email",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Criar convite
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 7); // Expira em 7 dias
-
-      const { error: inviteError } = await supabase
-        .from('family_invites')
-        .insert({
-          family_id: currentFamily.id,
-          email: emailToInvite,
-          role: inviteRole,
-          invited_by: user.id,
-          expires_at: expiresAt.toISOString()
-        });
-
-      if (inviteError) throw inviteError;
-
-      toast({
-        title: "Convite Enviado! 📧",
-        description: `Convite enviado para ${emailToInvite}`,
-      });
-
-      // Recarregar convites pendentes
-      await loadFamilyMembers(currentFamily.id); // Use loadFamilyMembers para atualizar a lista de convites
-      setInviteEmail('');
-
-    } catch (error: any) {
-      console.error('Erro ao enviar convite:', error);
-      toast({
-        title: "Erro ao Enviar Convite",
-        description: error.message || "Não foi possível enviar o convite",
-        variant: "destructive"
-      });
-    } finally {
-      setInviteLoading(false);
-    }
-  };
-
-  const acceptInvite = async (inviteId: string) => {
-    if (!user) return;
-
-    try {
-      const { data: result, error } = await supabase
-        .rpc('accept_family_invite_by_email', {
-          p_email: user.email?.toLowerCase() || '',
-          p_user_id: user.id
-        });
-
-      if (error) throw error;
-
-      const response = result as any;
-      if (response?.success) {
-        toast({
-          title: "Convite Aceite! 🎉",
-          description: response.message,
-        });
-
-        // Recarregar dados
-        await loadFamilyData();
-        await loadUserPendingInvites();
-      } else {
-        toast({
-          title: "Erro",
-          description: response?.message || "Erro desconhecido",
-          variant: "destructive"
-        });
-      }
-    } catch (error: any) {
-      toast({
-        title: "Erro ao Aceitar Convite",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const declineInvite = async (inviteId: string) => {
-    try {
-      const { error } = await supabase
-        .from('family_invites')
-        .update({ status: 'declined' })
-        .eq('id', inviteId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Convite Recusado",
-        description: "O convite foi recusado",
-      });
-
-      await loadUserPendingInvites();
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const removeMember = async (memberId: string, memberName?: string) => {
-    if (!currentFamily) return;
-
-    try {
-      // Verificar se o utilizador atual é owner ou admin
-      if (!['owner', 'admin'].includes(userRole)) {
-        toast({
-          title: "Permissão Negada",
-          description: "Apenas owners e admins podem remover membros",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Verificar se não está a tentar remover o próprio owner
-      const memberToRemove = familyMembers.find(m => m.id === memberId);
-      if (memberToRemove?.role === 'owner') {
-        toast({
-          title: "Operação Não Permitida",
-          description: "Não é possível remover o owner da família",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Verificar se não está a tentar remover a si próprio
-      if (memberToRemove?.user_id === user?.id) {
-        toast({
-          title: "Operação Não Permitida",
-          description: "Use 'Sair da Família' para se remover",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      const { error } = await supabase
-        .from('family_members')
-        .delete()
-        .eq('id', memberId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Membro Removido",
-        description: `${memberName || 'O membro'} foi removido da família com sucesso`,
-      });
-
-      await loadFamilyMembers(currentFamily.id);
-
-    } catch (error: any) {
-      console.error('Erro ao remover membro:', error);
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao remover membro da família",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const cancelInvite = async (inviteId: string) => {
-    try {
-      const { error } = await supabase
-        .from('family_invites')
-        .delete()
-        .eq('id', inviteId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Convite Cancelado",
-        description: "O convite foi cancelado",
-      });
-
-      if (currentFamily) {
-        await loadFamilyMembers(currentFamily.id); // Use loadFamilyMembers para atualizar a lista de convites
-      }
-
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao cancelar convite",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const updateMemberRole = async (memberId: string, newRole: 'admin' | 'member' | 'viewer') => {
-    try {
-      const { error } = await supabase
-        .from('family_members')
-        .update({ role: newRole })
-        .eq('id', memberId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Função Atualizada",
-        description: `A função do membro foi alterada para ${getRoleLabel(newRole)}`,
-      });
-
-      if (currentFamily) {
-        await loadFamilyMembers(currentFamily.id);
-      }
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const deleteFamily = async () => {
-    if (!currentFamily || !user) return;
-
-    try {
-      // Eliminar todos os dados relacionados
-      await supabase.from('family_invites').delete().eq('family_id', currentFamily.id);
-      await supabase.from('family_members').delete().eq('family_id', currentFamily.id);
-      
-      const { error } = await supabase
-        .from('families')
-        .delete()
-        .eq('id', currentFamily.id)
-        .eq('created_by', user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Família Eliminada",
-        description: "A família foi eliminada com sucesso",
-      });
-
-      // Limpar estado
-      setCurrentFamily(null);
-      setFamilyMembers([]);
-      setPendingInvites([]);
-      setUserRole('viewer');
-      setShowDeleteFamily(false);
-
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message,
-        variant: "destructive"
-      });
     }
   };
 
@@ -660,10 +223,9 @@ export const FamilyManager = () => {
         description: `Saiu da família "${currentFamily.nome}" com sucesso`,
       });
 
-      // Limpar estado
-      setCurrentFamily(null);
-      setFamilyMembers([]);
-      setPendingInvites([]);
+      // Remover estado
+      // setCurrentFamily(null); // já é feito pelo hook
+      // setFamilyMembers([]); // já é feito pelo hook
       setUserRole('viewer');
 
     } catch (error: any) {
@@ -714,7 +276,7 @@ export const FamilyManager = () => {
       });
 
       await loadFamilyData();
-      await loadFamilyMembers(currentFamily.id);
+      await loadFamilyMembers();
 
     } catch (error: any) {
       console.error('Erro ao transferir ownership:', error);
@@ -777,7 +339,7 @@ export const FamilyManager = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={handleRefresh}
+            onClick={handleRefreshManual}
             disabled={refreshing}
             className="flex items-center gap-2"
           >
@@ -920,7 +482,10 @@ export const FamilyManager = () => {
                         </div>
                       </div>
                       <Button 
-                        onClick={inviteMember} 
+                        onClick={() => {
+                          inviteMember(inviteEmail, inviteRole);
+                          setInviteEmail("");
+                        }}
                         disabled={inviteLoading || !inviteEmail.trim()}
                       >
                         <Mail className="h-4 w-4 mr-2" />
@@ -997,7 +562,7 @@ export const FamilyManager = () => {
                                   <AlertDialogFooter>
                                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                                     <AlertDialogAction
-                                      onClick={() => removeMember(member.id, member.profiles?.nome)}
+                                      onClick={() => removeMember(member.id)}
                                       className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                                     >
                                       Remover Membro
@@ -1127,7 +692,7 @@ export const FamilyManager = () => {
                             <Button 
                               variant="ghost" 
                               size="sm"
-                              onClick={() => cancelInvite(invite.id)}
+                              onClick={() => declineInvite(invite.id)}
                             >
                               <X className="h-4 w-4" />
                             </Button>

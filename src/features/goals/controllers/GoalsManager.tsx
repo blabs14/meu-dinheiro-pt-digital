@@ -8,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { GoalForm } from './GoalForm';
 import { GoalCard } from './GoalCard';
 import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
+import { useGoalsData } from '@/hooks/useGoalsData';
 
 interface Goal {
   id: string;
@@ -26,8 +27,14 @@ interface GoalsManagerProps {
 export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Substituir estados e funções de metas pelo hook
+  const {
+    goals,
+    loading,
+    loadGoals,
+    deleteGoal,
+    updateGoalAmount,
+  } = useGoalsData(user?.id ?? null, familyId);
   const [formOpen, setFormOpen] = useState(false);
   const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
 
@@ -36,41 +43,6 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
       loadGoals();
     }
   }, [user, refreshTrigger]);
-
-  const loadGoals = async () => {
-    try {
-      setLoading(true);
-      let query = supabase.from('goals').select('*');
-      
-      // Se familyId for fornecido, filtrar apenas metas dessa família
-      if (familyId) {
-        console.log('🔍 [GoalsManager] Carregando metas da família:', familyId);
-        query = query.eq('family_id', familyId);
-      } else {
-        // Se não for fornecido, mostrar apenas metas pessoais (sem family_id)
-        console.log('🔍 [GoalsManager] Carregando metas pessoais');
-        query = query.is('family_id', null);
-      }
-      
-      const { data, error } = await query.order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      console.log('🔍 [GoalsManager] Metas carregadas:', data?.length || 0);
-      console.log('🔍 [GoalsManager] Metas:', data);
-      
-      setGoals(data || []);
-    } catch (error: unknown) {
-      console.error('❌ [GoalsManager] Erro ao carregar metas:', error);
-      toast({
-        title: "Erro",
-        description: "Erro ao carregar metas",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleDelete = async (goalId: string) => {
     try {
