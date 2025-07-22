@@ -27,11 +27,17 @@ export const deleteGoal = async (supabase: any, goalId: string) => {
   return await (supabase.from('goals') as any).delete().eq('id', goalId);
 };
 
+export const fetchGoalById = async (supabase: any, id: string) => {
+  const { data, error } = await supabase.from('goals').select('*').eq('id', id).single();
+  return { data, error };
+};
+
 export function makeGoalService(supabase: any) {
   return {
     fetchGoals: (filters: any) => fetchGoals(supabase, filters),
     createGoal: (payload: any) => createGoal(supabase, payload),
     updateGoalProgress: (goalId: string, valorAtual: number) => updateGoalProgress(supabase, goalId, valorAtual),
     deleteGoal: (goalId: string) => deleteGoal(supabase, goalId),
+    fetchGoalById: (id: string) => fetchGoalById(supabase, id),
   };
 } 

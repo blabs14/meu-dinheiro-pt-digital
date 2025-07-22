@@ -27,6 +27,23 @@ export function createTransactionsRoutes(transactionService, jwtAuth) {
     res.status(201).json({ success: true, data });
   }));
 
+  // GET /transactions/:id
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { data, error } = await transactionService.fetchTransactionById(id);
+    if (error || !data) return res.status(404).json({ success: false, error: error?.message || 'Transação não encontrada' });
+    res.json({ success: true, data });
+  }));
+
+  // PUT /transactions/:id
+  router.put('/:id', asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { data, error } = await transactionService.updateTransaction(id, req.body);
+    if (error || !data) return res.status(404).json({ success: false, error: error?.message || 'Transação não encontrada' });
+    res.set('Cache-Control', 'no-store');
+    res.json({ success: true, data });
+  }));
+
   // (Poderão ser adicionados outros endpoints, como update/delete, conforme necessário)
 
   return router;

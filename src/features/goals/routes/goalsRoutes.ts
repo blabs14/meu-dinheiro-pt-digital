@@ -187,6 +187,14 @@ export function createGoalsRoutes(goalService, jwtAuth) {
     res.status(201).json({ success: true, data });
   }));
 
+  // GET /goals/:id
+  router.get('/:id', asyncHandler(async (req, res) => {
+    const { id } = req.params;
+    const { data, error } = await goalService.fetchGoalById(id);
+    if (error || !data) return res.status(404).json({ success: false, error: error?.message || 'Meta não encontrada' });
+    res.json({ success: true, data });
+  }));
+
   // PUT /goals/:id/progress
   router.put('/:id/progress', asyncHandler(async (req, res) => {
     const { data, error } = await goalService.updateGoalProgress(req.params.id, req.body.valorAtual);

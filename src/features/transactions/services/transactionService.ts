@@ -109,6 +109,16 @@ export const autoSaveOnIncome = async (supabase: any, transaction: any, options?
   }
 };
 
+export const fetchTransactionById = async (supabase: any, id: string) => {
+  const { data, error } = await supabase.from('transactions').select('*').eq('id', id).single();
+  return { data, error };
+};
+
+export const updateTransaction = async (supabase: any, id: string, updates: any) => {
+  const { data, error } = await supabase.from('transactions').update(updates).eq('id', id).select();
+  return { data: data ? data[0] : null, error };
+};
+
 export function makeTransactionService(supabase: any) {
   return {
     fetchTransactions: (filters: any) => fetchTransactions(supabase, filters),
@@ -116,5 +126,7 @@ export function makeTransactionService(supabase: any) {
     classifyTransaction,
     applySplit,
     autoSaveOnIncome: (transaction: any, options?: any) => autoSaveOnIncome(supabase, transaction, options),
+    fetchTransactionById: (id: string) => fetchTransactionById(supabase, id),
+    updateTransaction: (id: string, updates: any) => updateTransaction(supabase, id, updates),
   };
 } 

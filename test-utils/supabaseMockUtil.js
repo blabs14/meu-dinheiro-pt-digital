@@ -17,6 +17,8 @@ let familyMembersDb = [
     role: 'owner',
   },
 ];
+let goalsDb = [];
+let transactionsDb = [];
 
 function familiesChainable() {
   return {
@@ -71,6 +73,125 @@ function familiesChainable() {
   };
 }
 
+function goalsChainable() {
+  let query = { eq: () => query, is: () => query, order: () => Promise.resolve({ data: goalsDb, error: null }), single: () => Promise.resolve({ data: goalsDb[0] || null, error: null }) };
+  query.eq = (field, value) => {
+    if (field === 'id') {
+      return {
+        single: () => {
+          const goal = goalsDb.find(g => g.id === value);
+          return Promise.resolve({ data: goal || null, error: goal ? null : { message: 'Meta não encontrada' } });
+        }
+      };
+    }
+    // Filtrar por outros campos (user_id, family_id, etc.)
+    const filtered = goalsDb.filter(g => g[field] === value);
+    return {
+      order: () => Promise.resolve({ data: filtered, error: null }),
+      single: () => Promise.resolve({ data: filtered[0] || null, error: null })
+    };
+  };
+  query.is = (field, value) => query;
+  query.order = () => Promise.resolve({ data: goalsDb, error: null });
+  query.single = () => Promise.resolve({ data: goalsDb[0] || null, error: null });
+  return {
+    insert: (payload) => {
+      const data = Array.isArray(payload) ? payload[0] : payload;
+      if (!data?.nome || typeof data.valor_objetivo !== 'number' || data.valor_objetivo < 0) {
+        return {
+          select: () => Promise.resolve({ data: null, error: { message: 'Dados inválidos' } })
+        };
+      }
+      const newGoal = { ...data, id: `goal-${goalsDb.length + 1}` };
+      goalsDb.push(newGoal);
+      return {
+        select: () => Promise.resolve({ data: [newGoal], error: null })
+      };
+    },
+    select: () => query,
+    update: (updates) => ({
+      eq: (field, value) => ({
+        select: () => {
+          const idx = goalsDb.findIndex(g => g.id === value);
+          if (idx === -1) return Promise.resolve({ data: null, error: { message: 'Meta não encontrada' } });
+          goalsDb[idx] = { ...goalsDb[idx], ...updates };
+          return Promise.resolve({ data: [goalsDb[idx]], error: null });
+        }
+      })
+    }),
+    delete: () => ({
+      eq: (field, value) => {
+        const idx = goalsDb.findIndex(g => g.id === value);
+        if (idx === -1) return Promise.resolve({ data: null, error: { message: 'Meta não encontrada' } });
+        const removed = goalsDb.splice(idx, 1);
+        return Promise.resolve({ data: removed, error: null });
+      }
+    })
+  };
+}
+
+function transactionsChainable() {
+  let query = { eq: () => query, is: () => query, order: () => Promise.resolve({ data: transactionsDb, error: null }), single: () => Promise.resolve({ data: transactionsDb[0] || null, error: null }) };
+  query.eq = (field, value) => {
+    if (field === 'id') {
+      return {
+        single: () => {
+          const tx = transactionsDb.find(t => t.id === value);
+          return Promise.resolve({ data: tx || null, error: tx ? null : { message: 'Transação não encontrada' } });
+        },
+        select: () => {
+          const tx = transactionsDb.find(t => t.id === value);
+          return Promise.resolve({ data: tx ? [tx] : [], error: tx ? null : { message: 'Transação não encontrada' } });
+        }
+      };
+    }
+    // Filtrar por outros campos (user_id, family_id, etc.)
+    const filtered = transactionsDb.filter(t => t[field] === value);
+    return {
+      order: () => Promise.resolve({ data: filtered, error: null }),
+      single: () => Promise.resolve({ data: filtered[0] || null, error: null }),
+      select: () => Promise.resolve({ data: filtered, error: null })
+    };
+  };
+  query.is = (field, value) => query;
+  query.order = () => Promise.resolve({ data: transactionsDb, error: null });
+  query.single = () => Promise.resolve({ data: transactionsDb[0] || null, error: null });
+  return {
+    insert: (payload) => {
+      const data = Array.isArray(payload) ? payload[0] : payload;
+      if (!data?.user_id || typeof data.valor !== 'number' || data.valor < 0) {
+        return {
+          select: () => Promise.resolve({ data: null, error: { message: 'Dados inválidos' } })
+        };
+      }
+      const newTx = { ...data, id: `tx-${transactionsDb.length + 1}` };
+      transactionsDb.push(newTx);
+      return {
+        select: () => Promise.resolve({ data: [newTx], error: null })
+      };
+    },
+    select: () => query,
+    update: (updates) => ({
+      eq: (field, value) => ({
+        select: () => {
+          const idx = transactionsDb.findIndex(t => t.id === value);
+          if (idx === -1) return Promise.resolve({ data: null, error: { message: 'Transação não encontrada' } });
+          transactionsDb[idx] = { ...transactionsDb[idx], ...updates };
+          return Promise.resolve({ data: [transactionsDb[idx]], error: null });
+        }
+      })
+    }),
+    delete: () => ({
+      eq: (field, value) => {
+        const idx = transactionsDb.findIndex(t => t.id === value);
+        if (idx === -1) return Promise.resolve({ data: null, error: { message: 'Transação não encontrada' } });
+        const removed = transactionsDb.splice(idx, 1);
+        return Promise.resolve({ data: removed, error: null });
+      }
+    })
+  };
+}
+
 function chainable(table) {
   if (table === 'families') return familiesChainable();
   if (table === 'family_members') {
@@ -95,21 +216,8 @@ function chainable(table) {
       }),
     };
   }
-  if (table === 'goals') {
-    return {
-      data: [
-        {
-          id: '1',
-          nome: 'Meta Teste',
-          user_id: 'user1',
-          created_at: '2024-01-01',
-          valor: 100,
-          concluida: false
-        }
-      ],
-      error: null
-    };
-  }
+  if (table === 'goals') return goalsChainable();
+  if (table === 'transactions') return transactionsChainable();
   return mockResult;
 }
 
