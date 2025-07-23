@@ -1,6 +1,6 @@
 // Remover import fixo do supabase
 // import { supabase } from '@/integrations/supabase/client';
-// import { goalSchema } from '../models/goalSchema'; // Ativar quando necessário
+import { goalSchema } from '../models/goalSchema';
 
 export const fetchGoals = async (supabase: any, filters: any) => {
   let query: any = supabase.from('goals').select('*');
@@ -12,9 +12,22 @@ export const fetchGoals = async (supabase: any, filters: any) => {
 };
 
 export const createGoal = async (supabase: any, payload: any) => {
-  // TODO: validar com goalSchema
-  if (!payload || typeof payload.valor_objetivo !== 'number' || payload.valor_objetivo < 0) {
-    return { data: null, error: { message: 'Dados inválidos', details: [{ path: ['valor_objetivo'], message: 'Valor objetivo deve ser positivo' }] } };
+  // Mapear campos do payload para o schema
+  const mapped = {
+    name: payload.nome,
+    targetAmount: payload.valor_objetivo,
+    deadline: payload.data_limite,
+    userId: payload.user_id,
+  };
+  const validation = goalSchema.safeParse(mapped);
+  if (!validation.success) {
+    return {
+      data: null,
+      error: {
+        message: 'Dados inválidos',
+        details: validation.error.errors.map(e => ({ path: e.path, message: e.message }))
+      }
+    };
   }
   return await (supabase.from('goals') as any).insert(payload).select();
 };
