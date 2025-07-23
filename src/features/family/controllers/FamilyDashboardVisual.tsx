@@ -22,6 +22,7 @@ import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
 import { RecentTransactions } from '@/features/transactions/components/RecentTransactions';
 import { GoalsManager } from '@/features/goals/components/GoalsManager';
 import { FamilySelector } from './FamilySelector';
+import { formatCurrency } from '@/lib/utils';
 
 interface FamilyMember {
   id: string;
@@ -292,13 +293,6 @@ export const FamilyDashboardVisual = () => {
 
   const rejectInvite = async (inviteId: string) => {
     setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
   };
 
   const getRoleLabel = (role: string) => {

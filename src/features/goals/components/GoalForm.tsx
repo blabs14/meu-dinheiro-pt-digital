@@ -14,6 +14,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+import { formatCurrency } from '@/lib/utils';
 
 interface Goal {
   id?: string;
@@ -151,11 +152,6 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
     } finally {
       setLoading(false);
     }
-  };
-
-  const formatCurrency = (value: string) => {
-    const numericValue = value.replace(/[^\d,]/g, '').replace(',', '.');
-    return numericValue;
   };
 
   const isEditing = !!goal?.id;

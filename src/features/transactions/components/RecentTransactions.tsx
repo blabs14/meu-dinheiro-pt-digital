@@ -9,6 +9,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
 import { SkeletonList } from '@/components/ui/SkeletonList';
+import { formatCurrency } from '@/lib/utils';
 
 interface Transaction {
   id: string;
@@ -45,13 +46,6 @@ export const RecentTransactions = ({ familyId, accountId, selectedMonth }: Recen
       console.log('⚠️ [RecentTransactions] No user found or window not available');
     }
   }, [user, familyId, accountId, selectedMonth]);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
-  };
 
   const formatDate = (dateString: string) => {
     return format(new Date(dateString), "dd MMM", { locale: pt });

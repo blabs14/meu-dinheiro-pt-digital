@@ -28,6 +28,7 @@ import { useFamilyStats } from '@/hooks/useFamilyStats';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { makeFamilyService } from '@/features/family/services/familyService';
 import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency } from '@/lib/utils';
 
 interface FamilyMember {
   id: string;
@@ -454,13 +455,6 @@ export const FamilyDashboard = () => {
     } catch (error) {
       console.error('❌ FamilyDashboard - Erro ao sair da família:', error);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
   };
 
   const getRoleLabel = (role: string) => {

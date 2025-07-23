@@ -7,6 +7,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Target, Edit, Trash2, Calendar, Euro, TrendingUp } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { formatCurrency } from '@/lib/utils';
 
 interface Goal {
   id: string;
@@ -27,13 +28,6 @@ interface GoalCardProps {
 
 export const GoalCard = ({ goal, onEdit, onDelete, onUpdateAmount }: GoalCardProps) => {
   const [isUpdating, setIsUpdating] = useState(false);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
-  };
 
   const progressPercentage = goal.valor_objetivo > 0 ? Math.min((goal.valor_atual / goal.valor_objetivo) * 100, 100) : 0;
   const remainingAmount = Math.max(goal.valor_objetivo - goal.valor_atual, 0);

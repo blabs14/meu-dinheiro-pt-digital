@@ -11,6 +11,7 @@ import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { useGoalsData } from '@/hooks/useGoalsData';
 import { makeGoalService } from '../services/goalService';
 import { SkeletonList } from '@/components/ui/SkeletonList';
+import { formatCurrency } from '@/lib/utils';
 
 interface Goal {
   id: string;
@@ -81,13 +82,6 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
   const handleFormClose = () => {
     setFormOpen(false);
     setEditingGoal(null);
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
   };
 
   // Estatísticas

@@ -20,18 +20,12 @@ import {
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { settingsService } from '../services/settingsService';
+import { formatCurrency } from '@/lib/utils';
 
 export const DataExport = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-PT', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(value);
-  };
 
   const downloadFile = (content: string, filename: string, type: string) => {
     const blob = new Blob([content], { type });
