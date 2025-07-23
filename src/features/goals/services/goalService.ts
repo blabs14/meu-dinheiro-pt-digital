@@ -5,7 +5,11 @@ import { goalSchema } from '../models/goalSchema';
 export const fetchGoals = async (supabase: any, filters: any) => {
   let query: any = supabase.from('goals').select('*');
   if (filters.userId) query = query.eq('user_id', filters.userId);
-  if (filters.familyId) query = query.eq('family_id', filters.familyId);
+  if (filters.familyId) {
+    query = query.eq('family_id', filters.familyId);
+  } else {
+    query = query.is('family_id', null); // Só metas pessoais
+  }
   if (filters.accountId && filters.accountId !== 'all') query = query.eq('account_id', filters.accountId);
   if (filters.status) query = query.eq('status', filters.status);
   return await query;

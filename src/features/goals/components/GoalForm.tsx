@@ -29,14 +29,15 @@ interface GoalFormProps {
   onOpenChange: (open: boolean) => void;
   goal?: Goal | null;
   onSuccess?: () => void;
+  isFamilyContext?: boolean;
 }
 
-export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps) => {
+export const GoalForm = ({ open, onOpenChange, goal, onSuccess, isFamilyContext = false }: GoalFormProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [deadline, setDeadline] = useState<Date | undefined>();
-  const [isFamily, setIsFamily] = useState(false);
+  const [isFamily, setIsFamily] = useState(isFamilyContext);
   const [familyId, setFamilyId] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
@@ -59,6 +60,7 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
         if (goal.prazo) {
           setDeadline(new Date(goal.prazo));
         }
+        setIsFamily(isFamilyContext);
       } else {
         // Nova meta
         setFormData({
@@ -68,9 +70,10 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
           descricao: ''
         });
         setDeadline(undefined);
+        setIsFamily(isFamilyContext);
       }
     }
-  }, [open, goal]);
+  }, [open, goal, isFamilyContext]);
 
   useEffect(() => {
     // Buscar family_id do utilizador autenticado
@@ -100,7 +103,7 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
         valor_objetivo: valorMetaNum, // Corrigido: usar valor_objetivo
         valor_atual: valorAtualNum,
         prazo: deadline ? format(deadline, 'yyyy-MM-dd') : null,
-        family_id: isFamily && familyId ? familyId : null
+        family_id: (isFamilyContext || isFamily) && familyId ? familyId : null
       };
 
       console.log('🔍 [GoalForm] Criando meta com dados:', goalData);
@@ -252,10 +255,13 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
             </Popover>
           </div>
 
-          <div className="flex items-center gap-2 mb-4">
-            <Switch id="is-family" checked={isFamily} onCheckedChange={setIsFamily} />
-            <label htmlFor="is-family" className="text-sm">Esta meta é da família?</label>
-          </div>
+          {/* Switch só aparece se não for contexto familiar */}
+          {!isFamilyContext && (
+            <div className="flex items-center gap-2 mb-4">
+              <Switch id="is-family" checked={isFamily} onCheckedChange={setIsFamily} />
+              <label htmlFor="is-family" className="text-sm">Esta meta é da família?</label>
+            </div>
+          )}
 
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

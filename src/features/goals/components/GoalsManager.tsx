@@ -248,6 +248,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
         onOpenChange={handleFormClose}
         goal={editingGoal}
         onSuccess={loadGoals}
+        isFamilyContext={!!familyId}
       />
     </div>
   );

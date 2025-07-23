@@ -592,26 +592,6 @@ export const FamilyDashboard = () => {
                 Dashboard da família • {familyMembers.length} membros • Você é {getRoleLabel(userRole)}
               </p>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={refreshing}
-                className="flex items-center gap-2"
-              >
-                <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-                {refreshing ? 'A atualizar...' : 'Atualizar'}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => navigate('/settings')}
-              >
-                <Settings className="h-4 w-4 mr-2" />
-                Gerir Família
-              </Button>
-            </div>
           </div>
 
           {/* Stats Cards */}
