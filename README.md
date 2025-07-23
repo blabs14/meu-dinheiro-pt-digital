@@ -72,6 +72,10 @@ To connect a domain, navigate to Project > Settings > Domains and click Connect 
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
 
+## Scripts SQL antigos
+
+Todos os scripts SQL antigos e ficheiros de dump foram movidos para a pasta `archive/sql/` na raiz do projeto. Apenas a pasta `supabase/migrations/` deve ser usada para novas migrações.
+
 ## Testes de Hooks com Supabase (Importante)
 
 ### Limitação do Jest com ESM
