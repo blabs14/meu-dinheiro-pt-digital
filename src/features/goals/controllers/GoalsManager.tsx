@@ -10,6 +10,7 @@ import { GoalCard } from './GoalCard';
 import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
 import { useGoalsData } from '@/hooks/useGoalsData';
 import { makeGoalService } from '../services/goalService';
+import { SkeletonList } from '@/components/ui/SkeletonList';
 
 interface Goal {
   id: string;
@@ -100,12 +101,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
     return (
       <div className="min-h-screen bg-background">
         <div className="max-w-6xl mx-auto p-4">
-          <div className="flex items-center justify-center py-20">
-            <div className="text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-              <p className="text-muted-foreground">A carregar metas...</p>
-            </div>
-          </div>
+          <SkeletonList variant="card" count={3} />
         </div>
       </div>
     );

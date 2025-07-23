@@ -12,7 +12,7 @@ import Family from '@/pages/Family';
 import NotFound from '@/pages/NotFound';
 import { SettingsManager } from '@/components/settings/SettingsManager';
 import './App.css';
-import React from 'react'; // Added missing import for React
+import React from 'react';
 
 // Error Boundary Component
 interface ErrorBoundaryState {
@@ -71,18 +71,14 @@ console.log("React está a arrancar!");
 
 function App() {
   return (
-    <div>
-      <h1 style={{color: 'green', textAlign: 'center'}}>Teste rápido: React está a funcionar!</h1>
-      <ErrorBoundary>
-        <AppContent />
-      </ErrorBoundary>
-    </div>
+    <ErrorBoundary>
+      <AppContent />
+    </ErrorBoundary>
   );
 }
 
 function AppContent() {
   const { user, loading } = useAuth();
-  const { needsOnboarding, completeOnboarding } = useOnboarding();
 
   if (loading) {
     return (
@@ -99,25 +95,19 @@ function AppContent() {
     return <AuthForm />;
   }
 
-  if (needsOnboarding) {
-    return <OnboardingWizard onComplete={completeOnboarding} />;
-  }
-
   return (
     <Router>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/goals" element={<Goals />} />
-          <Route path="/family" element={<Family />} />
-          <Route path="/settings" element={<SettingsManager />} />
-          <Route path="/404" element={<NotFound />} />
-          <Route path="*" element={<Navigate to="/404" replace />} />
-        </Routes>
-        
-        <PWAInstallButton />
-        <NotificationSystem />
-      </Layout>
+      <div className="min-h-screen bg-background">
+        <Layout>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/goals" element={<Goals />} />
+            <Route path="/family" element={<Family />} />
+            <Route path="/settings" element={<SettingsManager />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </Layout>
+      </div>
     </Router>
   );
 }

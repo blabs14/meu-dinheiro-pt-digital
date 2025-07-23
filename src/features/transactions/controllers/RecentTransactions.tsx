@@ -8,6 +8,7 @@ import { TrendingUp, TrendingDown, Calendar } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { useTransactionsData } from '@/hooks/useTransactionsData';
+import { SkeletonList } from '@/components/ui/SkeletonList';
 
 interface Transaction {
   id: string;
@@ -24,25 +25,26 @@ interface Transaction {
 export interface RecentTransactionsProps {
   familyId?: string;
   accountId?: string;
+  selectedMonth?: string;
 }
 
-export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsProps) => {
+export const RecentTransactions = ({ familyId, accountId, selectedMonth }: RecentTransactionsProps) => {
   const { user } = useAuth();
   // Substituir estados e funções de transações pelo hook
   const {
     transactions,
     loading,
     loadRecentTransactions,
-  } = useTransactionsData(user?.id ?? null, familyId, accountId);
+  } = useTransactionsData(user?.id ?? null, familyId, accountId, selectedMonth);
 
   useEffect(() => {
-    if (user) {
+    if (user && typeof window !== 'undefined') {
       console.log('🔍 [RecentTransactions] useEffect triggered - loading transactions');
       loadRecentTransactions();
     } else {
-      console.log('⚠️ [RecentTransactions] No user found');
+      console.log('⚠️ [RecentTransactions] No user found or window not available');
     }
-  }, [user, familyId, accountId]);
+  }, [user, familyId, accountId, selectedMonth]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-PT', {
@@ -55,6 +57,24 @@ export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsPr
     return format(new Date(dateString), "dd MMM", { locale: pt });
   };
 
+  const getCardDescription = () => {
+    if (familyId) {
+      return 'Movimentações partilhadas com a família';
+    }
+    
+    if (selectedMonth === 'current') {
+      return `Transações do mês atual (${transactions.length} movimentações)`;
+    } else if (selectedMonth === 'all') {
+      return `Últimas 25 transações (${transactions.length} movimentações)`;
+    } else if (selectedMonth) {
+      const [year, month] = selectedMonth.split('-');
+      const monthName = new Date(parseInt(year), parseInt(month) - 1).toLocaleDateString('pt-PT', { month: 'long', year: 'numeric' });
+      return `Transações de ${monthName} (${transactions.length} movimentações)`;
+    }
+    
+    return `Transações do mês atual (${transactions.length} movimentações)`;
+  };
+
   if (loading) {
     return (
       <Card>
@@ -65,20 +85,7 @@ export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsPr
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {[...Array(5)].map((_, i) => (
-              <div key={i} className="flex items-center justify-between p-3 border rounded-lg animate-pulse">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-muted rounded-full" />
-                  <div className="space-y-1">
-                    <div className="w-24 h-4 bg-muted rounded" />
-                    <div className="w-16 h-3 bg-muted rounded" />
-                  </div>
-                </div>
-                <div className="w-20 h-4 bg-muted rounded" />
-              </div>
-            ))}
-          </div>
+          <SkeletonList variant="card" count={5} />
         </CardContent>
       </Card>
     );
@@ -92,10 +99,7 @@ export const RecentTransactions = ({ familyId, accountId }: RecentTransactionsPr
           {familyId ? 'Transações da Família' : 'Transações Recentes'}
         </CardTitle>
         <CardDescription>
-          {familyId 
-            ? 'Movimentações partilhadas com a família'
-            : `Últimas ${transactions.length} movimentações`
-          }
+          {getCardDescription()}
         </CardDescription>
       </CardHeader>
       <CardContent>

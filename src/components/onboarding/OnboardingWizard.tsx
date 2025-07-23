@@ -25,6 +25,7 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { useOnboardingData } from '@/hooks/useOnboardingData';
+import { SkeletonList } from '@/components/ui/SkeletonList';
 
 interface OnboardingStep {
   id: string;
@@ -386,14 +387,18 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
         </CardHeader>
 
         <CardContent className="space-y-6">
-          {renderStepContent()}
+          {loading ? (
+            <SkeletonList variant="card" count={2} />
+          ) : (
+            renderStepContent()
+          )}
 
           {currentStep < steps.length - 1 && (
             <div className="flex justify-between pt-6">
               <Button
                 variant="outline"
                 onClick={handlePrevious}
-                disabled={currentStep === 0}
+                disabled={currentStep === 0 || loading}
               >
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Anterior
@@ -403,10 +408,14 @@ export const OnboardingWizard = ({ onComplete }: OnboardingWizardProps) => {
                 onClick={handleNext}
                 disabled={!canProceed() || loading}
               >
-                {loading ? 'A guardar...' : (
-                  currentStep === steps.length - 2 ? 'Finalizar' : 'Próximo'
+                {loading ? (
+                  <span className="flex items-center"><SkeletonList variant="card" count={1} /></span>
+                ) : (
+                  <>
+                    {currentStep === steps.length - 2 ? 'Finalizar' : 'Próximo'}
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </>
                 )}
-                {!loading && <ArrowRight className="h-4 w-4 ml-2" />}
               </Button>
             </div>
           )}

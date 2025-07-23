@@ -40,13 +40,25 @@ export const fetchFamilyById = async (supabase: any, id: string) => {
 };
 
 export const fetchFamilyMembers = async (supabase: any, familyId: string) => {
+  console.log('🔍 familyService - fetchFamilyMembers - Iniciando para familyId:', familyId);
+  
   // Tentar função SQL primeiro
   const { data: membersData, error: membersError } = await supabase.rpc('get_family_members_with_profiles', { p_family_id: familyId });
-  if (!membersError && Array.isArray(membersData)) {
-    return { data: membersData, error: null };
+  
+  console.log('🔍 familyService - fetchFamilyMembers - Resposta da função SQL:', { membersData, membersError });
+  
+  if (!membersError && membersData && membersData.success) {
+    console.log('🔍 familyService - fetchFamilyMembers - Usando dados da função SQL');
+    return { data: membersData.members, error: null };
   }
+  
+  console.log('🔍 familyService - fetchFamilyMembers - Fallback para query direta');
+  
   // Fallback: Query direta
   const { data: directMembers, error: directError } = await supabase.from('family_members').select('*').eq('family_id', familyId);
+  
+  console.log('🔍 familyService - fetchFamilyMembers - Resposta da query direta:', { directMembers, directError });
+  
   if (directError) return { data: null, error: directError };
   return { data: directMembers, error: null };
 };

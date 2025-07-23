@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { FamilyData } from './useFamilyData';
 
@@ -21,18 +21,39 @@ export function useFamilyMembers(familyId: string | null, familyService: any) {
   const [loadingMembers, setLoadingMembers] = useState(false);
 
   const loadFamilyMembers = useCallback(async () => {
-    if (!familyId) return;
+    if (!familyId) {
+      console.log('🔍 useFamilyMembers - Sem familyId, não carregando membros');
+      return;
+    }
+    
+    console.log('🔍 useFamilyMembers - Iniciando carregamento para familyId:', familyId);
     setLoadingMembers(true);
+    
     try {
       const { data, error } = await familyService.fetchFamilyMembers(familyId);
+      console.log('🔍 useFamilyMembers - Resposta do service:', { data, error });
+      
       if (error) throw error;
+      
+      console.log('🔍 useFamilyMembers - Membros carregados:', data?.length || 0);
+      console.log('🔍 useFamilyMembers - Dados dos membros:', data);
       setFamilyMembers(data || []);
+      
     } catch (error) {
+      console.error('❌ useFamilyMembers - Erro:', error);
       toast({ title: 'Erro ao carregar membros', description: String(error) });
     } finally {
       setLoadingMembers(false);
     }
   }, [familyId, familyService, toast]);
+
+  // Carregar membros automaticamente quando familyId mudar
+  useEffect(() => {
+    if (familyId) {
+      console.log('🔍 useFamilyMembers - useEffect - Carregando membros para familyId:', familyId);
+      loadFamilyMembers();
+    }
+  }, [familyId, loadFamilyMembers]);
 
   const removeMember = useCallback(async (memberId: string) => {
     if (!familyId) return;

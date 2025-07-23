@@ -1,5 +1,5 @@
-import { FamilyDashboardVisualFixed } from '@/components/family/FamilyDashboardVisualFixed';
+import { FamilyDashboard } from '@/features/family/controllers/FamilyDashboard';
 
 export default function Family() {
-  return <FamilyDashboardVisualFixed />;
+  return <FamilyDashboard />;
 } 

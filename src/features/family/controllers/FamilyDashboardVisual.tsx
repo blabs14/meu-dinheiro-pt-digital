@@ -19,7 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
 import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
-import { RecentTransactions } from '@/components/transactions/RecentTransactions';
+import { RecentTransactions } from '@/features/transactions/controllers/RecentTransactions';
 import { GoalsManager } from '@/components/goals/GoalsManager';
 import { FamilySelector } from './FamilySelector';
 

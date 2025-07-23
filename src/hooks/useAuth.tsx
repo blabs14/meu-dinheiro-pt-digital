@@ -1,7 +1,6 @@
 import { useState, useEffect, createContext, useContext } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType {
   user: User | null;
@@ -18,7 +17,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const { toast } = useToast();
 
   useEffect(() => {
     // Set up auth state listener
@@ -56,27 +54,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) {
-        toast({
-          title: "Erro no registo",
-          description: error.message,
-          variant: "destructive"
-        });
+        console.error('Erro no registo:', error.message);
         return { error: error.message };
       }
 
-      toast({
-        title: "Registo efetuado",
-        description: "Verifique o seu email para confirmar a conta."
-      });
-
+      console.log('Registo efetuado - verifique o seu email para confirmar a conta.');
       return { error: null };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({
-        title: "Erro no registo",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      console.error('Erro no registo:', errorMessage);
       return { error: errorMessage };
     }
   };
@@ -89,22 +75,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) {
-        toast({
-          title: "Erro no login",
-          description: error.message,
-          variant: "destructive"
-        });
+        console.error('Erro no login:', error.message);
         return { error: error.message };
       }
 
       return { error: null };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({
-        title: "Erro no login",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      console.error('Erro no login:', errorMessage);
       return { error: errorMessage };
     }
   };
@@ -112,17 +90,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const signOut = async () => {
     try {
       await supabase.auth.signOut();
-      toast({
-        title: "Sessão terminada",
-        description: "Sessão terminada com sucesso."
-      });
+      console.log('Sessão terminada com sucesso.');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erro desconhecido';
-      toast({
-        title: "Erro",
-        description: errorMessage,
-        variant: "destructive"
-      });
+      console.error('Erro ao terminar sessão:', errorMessage);
     }
   };
 

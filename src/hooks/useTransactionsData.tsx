@@ -16,12 +16,21 @@ export interface Transaction {
   } | null;
 }
 
-export function useTransactionsData(userId: string | null, familyId?: string | null, accountId?: string | null) {
+export function useTransactionsData(
+  userId: string | null, 
+  familyId?: string | null, 
+  accountId?: string | null,
+  selectedMonth?: string
+) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
 
   const loadRecentTransactions = useCallback(async () => {
     if (!userId) return;
+    
+    // Verificação de segurança
+    if (typeof window === 'undefined') return;
+    
     setLoading(true);
     try {
       let query = supabase.from('transactions').select(`
@@ -41,6 +50,37 @@ export function useTransactionsData(userId: string | null, familyId?: string | n
       .eq('user_id', userId)
       .order('data', { ascending: false });
 
+      // Aplicar filtro de mês baseado no selectedMonth
+      if (selectedMonth === 'current') {
+        // Mês atual
+        const now = new Date();
+        const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+        
+        const startDate = firstDayOfMonth.toISOString().split('T')[0];
+        const endDate = lastDayOfMonth.toISOString().split('T')[0];
+        
+        console.log('🔍 [useTransactionsData] Buscando transações do mês atual:', { startDate, endDate });
+        
+        query = query.gte('data', startDate).lte('data', endDate);
+      } else if (selectedMonth && selectedMonth !== 'all') {
+        // Mês específico (formato: YYYY-MM)
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const firstDayOfMonth = new Date(year, month - 1, 1);
+        const lastDayOfMonth = new Date(year, month, 0);
+        
+        const startDate = firstDayOfMonth.toISOString().split('T')[0];
+        const endDate = lastDayOfMonth.toISOString().split('T')[0];
+        
+        console.log('🔍 [useTransactionsData] Buscando transações do mês específico:', { selectedMonth, startDate, endDate });
+        
+        query = query.gte('data', startDate).lte('data', endDate);
+      } else {
+        // Todos os meses - limitar a 25 transações
+        console.log('🔍 [useTransactionsData] Buscando últimas 25 transações (todos os meses)');
+        query = query.limit(25);
+      }
+
       if (accountId && accountId !== 'all') {
         query = query.eq('account_id', accountId);
       }
@@ -50,15 +90,18 @@ export function useTransactionsData(userId: string | null, familyId?: string | n
         query = query.is('family_id', null);
       }
 
-      const { data, error } = await query.limit(10);
+      const { data, error } = await query;
       if (error) throw error;
+      
+      console.log('🔍 [useTransactionsData] Transações encontradas:', data?.length || 0);
       setTransactions(data || []);
     } catch (error) {
+      console.error('❌ [useTransactionsData] Erro ao carregar transações:', error);
       setTransactions([]);
     } finally {
       setLoading(false);
     }
-  }, [userId, familyId, accountId]);
+  }, [userId, familyId, accountId, selectedMonth]);
 
   return {
     transactions,

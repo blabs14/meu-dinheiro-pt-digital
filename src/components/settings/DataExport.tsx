@@ -55,7 +55,6 @@ export const DataExport = () => {
           valor,
           data,
           tipo,
-          modo,
           descricao,
           created_at,
           categories:categoria_id (nome, cor)
@@ -71,7 +70,6 @@ export const DataExport = () => {
         'Valor (€)',
         'Tipo',
         'Categoria',
-        'Modo',
         'Descrição',
         'Data de Criação'
       ];
@@ -81,10 +79,9 @@ export const DataExport = () => {
         headers.join(','),
         ...transactions.map(t => [
           t.data,
-          t.valor.toString().replace('.', ','),
+          (t.valor?.toString() || '0').replace('.', ','),
           t.tipo,
           t.categories?.nome || 'Sem categoria',
-          t.modo,
           `"${t.descricao || ''}"`,
           format(new Date(t.created_at), 'dd/MM/yyyy HH:mm', { locale: pt })
         ].join(','))
@@ -169,7 +166,7 @@ export const DataExport = () => {
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('transactions').select(`
-          valor, data, tipo, modo, descricao, created_at,
+          valor, data, tipo, descricao, created_at,
           categories:categoria_id (nome, cor)
         `).eq('user_id', user.id).order('data', { ascending: false }),
         supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),

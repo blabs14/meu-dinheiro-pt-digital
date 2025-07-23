@@ -17,7 +17,7 @@ import {
   Filter
 } from 'lucide-react';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
-import { RecentTransactions } from '@/components/transactions/RecentTransactions';
+import { RecentTransactions } from '@/features/transactions/controllers/RecentTransactions';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
 import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
 import { SavingsProgressChart } from '@/components/charts/SavingsProgressChart';
@@ -478,15 +478,15 @@ export const Dashboard = () => {
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <ExpensesPieChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
-        <SavingsProgressChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
+        <ExpensesPieChart familyId={null} accountId={selectedAccountId} />
+        <SavingsProgressChart familyId={null} accountId={selectedAccountId} />
       </div>
 
       {/* Monthly Trend Chart */}
-      <MonthlyTrendChart familyId={null} selectedMonth={selectedMonth} accountId={selectedAccountId} />
+      <MonthlyTrendChart familyId={null} accountId={selectedAccountId} />
 
       {/* Recent Transactions */}
-      <RecentTransactions familyId={null} accountId={selectedAccountId} />
+      <RecentTransactions familyId={null} accountId={selectedAccountId} selectedMonth={selectedMonth} />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

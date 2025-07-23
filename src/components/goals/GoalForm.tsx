@@ -51,8 +51,8 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
         // Editar meta existente
         setFormData({
           nome: goal.nome,
-          valor_meta: goal.valor_meta.toString(),
-          valor_atual: goal.valor_atual.toString(),
+          valor_meta: goal.valor_meta?.toString() || '0',
+          valor_atual: goal.valor_atual?.toString() || '0',
           descricao: ''
         });
         if (goal.prazo) {

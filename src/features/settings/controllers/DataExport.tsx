@@ -52,15 +52,20 @@ export const DataExport = () => {
       const { data: transactions, error } = await supabase
         .from('transactions')
         .select(`
+          id,
           valor,
           data,
           tipo,
-          modo,
           descricao,
+          user_id,
+          family_id,
           created_at,
-          categories:categoria_id (nome, cor)
+          categories:categoria_id (
+            nome,
+            cor
+          )
         `)
-        .eq('user_id', user.id)
+        .eq('user_id', user!.id)
         .order('data', { ascending: false });
 
       if (error) throw error;
@@ -68,25 +73,33 @@ export const DataExport = () => {
       // Cabeçalhos CSV
       const headers = [
         'Data',
-        'Valor (€)',
+        'Valor',
         'Tipo',
         'Categoria',
-        'Modo',
         'Descrição',
-        'Data de Criação'
+        'Criado em'
       ];
 
       // Converter dados para CSV
+      const csvData = transactions.map(t => ({
+          id: t.id,
+          valor: t.valor,
+          data: t.data,
+          tipo: t.tipo,
+          descricao: t.descricao || '',
+          categoria: t.categories?.nome || 'Sem categoria',
+          criado_em: t.created_at
+        }));
+
       const csvContent = [
         headers.join(','),
-        ...transactions.map(t => [
+        ...csvData.map(t => [
           t.data,
-          t.valor.toString().replace('.', ','),
+          (t.valor?.toString() || '0').replace('.', ','),
           t.tipo,
-          t.categories?.nome || 'Sem categoria',
-          t.modo,
-          `"${t.descricao || ''}"`,
-          format(new Date(t.created_at), 'dd/MM/yyyy HH:mm', { locale: pt })
+          t.categoria,
+          `"${t.descricao}"`,
+          format(new Date(t.criado_em), 'dd/MM/yyyy HH:mm', { locale: pt })
         ].join(','))
       ].join('\n');
 
@@ -169,7 +182,7 @@ export const DataExport = () => {
       ] = await Promise.all([
         supabase.from('profiles').select('*').eq('user_id', user.id).single(),
         supabase.from('transactions').select(`
-          valor, data, tipo, modo, descricao, created_at,
+          valor, data, tipo, descricao, created_at,
           categories:categoria_id (nome, cor)
         `).eq('user_id', user.id).order('data', { ascending: false }),
         supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
