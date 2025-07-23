@@ -1,4 +1,4 @@
-import { GoalsManager } from '@/components/goals/GoalsManager';
+import { GoalsManager } from '@/features/goals/components/GoalsManager';
 
 export default function Goals() {
   return (

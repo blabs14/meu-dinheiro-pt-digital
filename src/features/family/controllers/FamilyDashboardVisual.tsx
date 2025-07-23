@@ -19,8 +19,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
 import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
-import { RecentTransactions } from '@/features/transactions/controllers/RecentTransactions';
-import { GoalsManager } from '@/components/goals/GoalsManager';
+import { RecentTransactions } from '@/features/transactions/components/RecentTransactions';
+import { GoalsManager } from '@/features/goals/components/GoalsManager';
 import { FamilySelector } from './FamilySelector';
 
 interface FamilyMember {
