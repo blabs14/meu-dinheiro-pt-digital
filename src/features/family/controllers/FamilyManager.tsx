@@ -118,6 +118,14 @@ export const FamilyManager = () => {
   // const [refreshing, setRefreshing] = useState(false); // já vem do hook
 
   useEffect(() => {
+    console.log('[FamilyManager] MONTADO');
+    return () => {
+      console.log('[FamilyManager] DESMONTADO');
+    };
+  }, []);
+  console.log('[FamilyManager] user:', user);
+
+  useEffect(() => {
     if (user) {
       loadFamilyData();
       loadUserPendingInvites();

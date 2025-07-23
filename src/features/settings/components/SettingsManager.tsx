@@ -1,6 +1,6 @@
 import { ProfileSettings } from './ProfileSettings';
 import { NotificationSettings } from './NotificationSettings';
-import { DataExport } from '../settings/DataExport';
+import { DataExport } from './DataExport';
 import { SimpleFamilyManager } from '@/features/family/controllers/SimpleFamilyManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 

@@ -91,11 +91,14 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
 
     setLoading(true);
     try {
+      // Converter strings para número, trocando vírgula por ponto
+      const valorMetaNum = parseFloat(formData.valor_meta.replace(',', '.')) || 0;
+      const valorAtualNum = parseFloat(formData.valor_atual.replace(',', '.')) || 0;
       const goalData = {
         user_id: user.id,
         nome: formData.nome,
-        valor_objetivo: parseFloat(formData.valor_meta), // Corrigido: usar valor_objetivo
-        valor_atual: parseFloat(formData.valor_atual),
+        valor_objetivo: valorMetaNum, // Corrigido: usar valor_objetivo
+        valor_atual: valorAtualNum,
         prazo: deadline ? format(deadline, 'yyyy-MM-dd') : null,
         family_id: isFamily && familyId ? familyId : null
       };
@@ -196,7 +199,11 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
               type="text"
               placeholder="0,00"
               value={formData.valor_meta}
-              onChange={(e) => setFormData({ ...formData, valor_meta: formatCurrency(e.target.value) })}
+              onChange={(e) => {
+                // Aceitar apenas números, vírgula e ponto
+                const raw = e.target.value.replace(/[^\d.,]/g, '');
+                setFormData({ ...formData, valor_meta: raw });
+              }}
               required
             />
           </div>
@@ -208,7 +215,10 @@ export const GoalForm = ({ open, onOpenChange, goal, onSuccess }: GoalFormProps)
               type="text"
               placeholder="0,00"
               value={formData.valor_atual}
-              onChange={(e) => setFormData({ ...formData, valor_atual: formatCurrency(e.target.value) })}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/[^\d.,]/g, '');
+                setFormData({ ...formData, valor_atual: raw });
+              }}
             />
             <p className="text-xs text-muted-foreground">
               Quanto já poupou para esta meta

@@ -112,3 +112,25 @@ const mockQuery = {
 ```
 
 Se precisares de testar integração real com Supabase, considera migrar para Vitest ou configurar Jest para ESM puro.
+
+## Limpeza e Organização do Projeto
+
+Este projeto foi alvo de uma limpeza profunda para garantir máxima manutenibilidade, performance e facilidade de onboarding. Foram removidos todos os ficheiros legacy, duplicados, dumps, scripts SQL de verificação/teste e diretórios vazios.
+
+### Diretórios e ficheiros a manter:
+- `src/` — Código-fonte principal (frontend, backend, hooks, utils, etc.)
+- `scripts/` — Apenas scripts referenciados nos npm scripts (`runMigrations.js`, `runSeed.js`, `seed.sql`, `setupTestEnv.js`).
+- `archive/sql/` — Apenas scripts de backup, criação/correção de estrutura e atualização de dados.
+- `test-utils/` — Apenas mocks de Supabase.
+- `public/` — Apenas assets essenciais (`favicon.ico`, `manifest.json`, `robots.txt`, `sw.js`, `placeholder.svg`).
+- `docs/` — Apenas documentação útil para padrões de modularização e testes.
+
+### Boas práticas em vigor:
+- Não manter ficheiros temporários, dumps, scripts legacy ou diretórios vazios.
+- Scripts SQL antigos e de auditoria ficam apenas em `archive/sql/` para referência.
+- Relatórios de coverage e ficheiros temporários são sempre removidos após uso.
+- O README e a documentação são mantidos atualizados para facilitar onboarding e manutenção.
+
+**Se adicionares novos scripts, dumps ou documentação, garante que cumprem estas regras para manter o projeto limpo e fácil de evoluir.**
+
+---

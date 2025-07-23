@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,21 +8,10 @@ import { useToast } from '@/hooks/use-toast';
 import { GoalForm } from './GoalForm';
 import { GoalCard } from './GoalCard';
 import { Target, Plus, TrendingUp, Clock, CheckCircle } from 'lucide-react';
-import { useGoalsData } from '@/hooks/useGoalsData';
+import { useGoalsData, Goal as GoalsDataGoal } from '@/hooks/useGoalsData';
 import { makeGoalService } from '../services/goalService';
 import { SkeletonList } from '@/components/ui/SkeletonList';
 import { formatCurrency } from '@/lib/utils';
-
-interface Goal {
-  id: string;
-  nome: string;
-  valor_objetivo: number; // Corrigido: usar valor_objetivo
-  valor_atual: number;
-  valor_meta?: number | null;
-  prazo: string | null;
-  created_at: string;
-  family_id?: string | null;
-}
 
 interface GoalsManagerProps {
   refreshTrigger?: number;
@@ -32,7 +21,7 @@ interface GoalsManagerProps {
 export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const goalService = makeGoalService(supabase);
+  const goalService = useMemo(() => makeGoalService(supabase), [supabase]);
   const {
     goals,
     loading,
@@ -41,13 +30,17 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
     updateGoalAmount,
   } = useGoalsData(user?.id ?? null, familyId, goalService);
   const [formOpen, setFormOpen] = useState(false);
-  const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+  const [editingGoal, setEditingGoal] = useState<GoalsDataGoal | null>(null);
 
   useEffect(() => {
-    if (user) {
-      loadGoals();
-    }
-  }, [user, refreshTrigger]);
+    console.log('[GoalsManager] MONTADO');
+    return () => {
+      console.log('[GoalsManager] DESMONTADO');
+    };
+  }, []);
+  console.log('[GoalsManager] user:', user);
+  console.log('[GoalsManager] loading:', loading);
+  console.log('[GoalsManager] goals:', goals);
 
   // Refatorar handlers para usar apenas o hook
   const handleDelete = async (goalId: string) => {
@@ -74,7 +67,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
     }
   };
 
-  const handleEdit = (goal: Goal) => {
+  const handleEdit = (goal: GoalsDataGoal) => {
     setEditingGoal(goal);
     setFormOpen(true);
   };
@@ -190,7 +183,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
             {goals.map((goal) => (
               <GoalCard
                 key={goal.id}
-                goal={{ ...goal, valor_meta: goal.valor_meta ?? null }}
+                goal={goal}
                 onEdit={handleEdit}
                 onDelete={handleDelete}
                 onUpdateAmount={handleUpdateAmount}

@@ -8,20 +8,11 @@ import { Target, Edit, Trash2, Calendar, Euro, TrendingUp } from 'lucide-react';
 import { format, differenceInDays, isPast } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { formatCurrency } from '@/lib/utils';
-
-interface Goal {
-  id: string;
-  nome: string;
-  valor_objetivo: number;
-  valor_atual: number;
-  prazo: string | null;
-  created_at: string;
-  valor_meta?: number | null;
-}
+import type { Goal as GoalsDataGoal } from '@/hooks/useGoalsData';
 
 interface GoalCardProps {
-  goal: Goal;
-  onEdit: (goal: Goal) => void;
+  goal: GoalsDataGoal;
+  onEdit: (goal: GoalsDataGoal) => void;
   onDelete: (goalId: string) => void;
   onUpdateAmount: (goalId: string, newAmount: number) => void;
 }

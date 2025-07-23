@@ -1,291 +1,166 @@
-import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  Download, 
-  FileText, 
-  FileSpreadsheet, 
-  Database, 
-  Calendar,
-  Target,
-  CreditCard,
-  Shield,
-  Info
-} from 'lucide-react';
-import { format } from 'date-fns';
-import { pt } from 'date-fns/locale';
 import { settingsService } from '../services/settingsService';
-import { formatCurrency } from '@/lib/utils';
+import { Download, Info, ShieldCheck, FileText, Target, Database } from 'lucide-react';
+
+function downloadFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 100);
+}
+
+function toCSV(transactions: any[]): string {
+  if (!transactions || transactions.length === 0) return '';
+  const header = Object.keys(transactions[0]).join(',');
+  const rows = transactions.map(t => Object.values(t).map(v => {
+    if (typeof v === 'object' && v !== null) return JSON.stringify(v);
+    return String(v).replace(/"/g, '""');
+  }).join(','));
+  return [header, ...rows].join('\n');
+}
 
 export const DataExport = () => {
   const { user } = useAuth();
-  const { toast } = useToast();
   const [loading, setLoading] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const downloadFile = (content: string, filename: string, type: string) => {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  };
+  if (!user) return null;
 
-  const exportTransactionsCSV = async () => {
-    if (!user) return;
-    setLoading('transactions-csv');
+  const handleExportTransactions = async () => {
+    setLoading('transactions'); setError(null);
     try {
-      const transactions = await settingsService.exportTransactionsCSV(user.id);
-      // Cabeçalhos CSV
-      const headers = [
-        'Data',
-        'Valor',
-        'Tipo',
-        'Categoria',
-        'Descrição',
-        'Criado em'
-      ];
-      const csvData = transactions.map(t => ({
-        id: t.id,
-        valor: t.valor,
-        data: t.data,
-        tipo: t.tipo,
-        descricao: t.descricao || '',
-        categoria: t.categories?.nome || 'Sem categoria',
-        criado_em: t.created_at
-      }));
-      const csvContent = [
-        headers.join(','),
-        ...csvData.map(t => [
-          t.data,
-          (t.valor?.toString() || '0').replace('.', ','),
-          t.tipo,
-          t.categoria,
-          `"${t.descricao}"`,
-          format(new Date(t.criado_em), 'dd/MM/yyyy HH:mm', { locale: pt })
-        ].join(','))
-      ].join('\n');
-      const filename = `transacoes_${format(new Date(), 'yyyy-MM-dd')}.csv`;
-      downloadFile(csvContent, filename, 'text/csv;charset=utf-8');
-      toast({
-        title: "Sucesso",
-        description: `${transactions.length} transações exportadas para ${filename}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao exportar transações",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(null);
-    }
+      const data = await settingsService.exportTransactionsCSV(user.id);
+      const csv = toCSV(data);
+      downloadFile('transacoes.csv', csv, 'text/csv');
+    } catch (e: any) {
+      setError('Erro ao exportar transações.');
+    } finally { setLoading(null); }
   };
 
-  const exportGoalsJSON = async () => {
-    if (!user) return;
-    setLoading('goals-json');
+  const handleExportGoals = async () => {
+    setLoading('goals'); setError(null);
     try {
-      const goals = await settingsService.exportGoalsJSON(user.id);
-      const exportData = {
-        exported_at: new Date().toISOString(),
-        user_id: user.id,
-        goals: goals.map(goal => ({
-          nome: goal.nome,
-          valor_meta: goal.valor_meta,
-          valor_atual: goal.valor_atual,
-          progresso_percentual: goal.valor_meta > 0 ? (goal.valor_atual / goal.valor_meta * 100).toFixed(1) : 0,
-          prazo: goal.prazo,
-          created_at: goal.created_at,
-          updated_at: goal.updated_at
-        }))
-      };
-      const filename = `metas_${format(new Date(), 'yyyy-MM-dd')}.json`;
-      downloadFile(JSON.stringify(exportData, null, 2), filename, 'application/json');
-      toast({
-        title: "Sucesso",
-        description: `${goals.length} metas exportadas para ${filename}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao exportar metas",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(null);
-    }
+      const data = await settingsService.exportGoalsJSON(user.id);
+      downloadFile('metas.json', JSON.stringify(data, null, 2), 'application/json');
+    } catch (e: any) {
+      setError('Erro ao exportar metas.');
+    } finally { setLoading(null); }
   };
 
-  const exportFullData = async () => {
-    if (!user) return;
-    setLoading('full-data');
+  const handleExportBackup = async () => {
+    setLoading('backup'); setError(null);
     try {
-      const fullExport = await settingsService.exportFullData(user.id, user.email, user.created_at);
-      const filename = `meu_dinheiro_backup_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.json`;
-      downloadFile(JSON.stringify(fullExport, null, 2), filename, 'application/json');
-      toast({
-        title: "Sucesso",
-        description: `Backup completo exportado para ${filename}`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao exportar dados completos",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(null);
-    }
+      const data = await settingsService.exportFullData(user.id, user.email, user.created_at);
+      downloadFile('backup_completo.json', JSON.stringify(data, null, 2), 'application/json');
+    } catch (e: any) {
+      setError('Erro ao exportar backup completo.');
+    } finally { setLoading(null); }
   };
-
-  const exportOptions = [
-    {
-      id: 'transactions-csv',
-      title: 'Transações (CSV)',
-      description: 'Exportar todas as transações em formato CSV para Excel',
-      icon: <FileSpreadsheet className="h-5 w-5" />,
-      action: exportTransactionsCSV,
-      badge: 'Recomendado'
-    },
-    {
-      id: 'goals-json',
-      title: 'Metas (JSON)',
-      description: 'Exportar metas de poupança em formato JSON',
-      icon: <Target className="h-5 w-5" />,
-      action: exportGoalsJSON,
-      badge: null
-    },
-    {
-      id: 'full-data',
-      title: 'Backup Completo (JSON)',
-      description: 'Exportar todos os dados incluindo perfil e estatísticas',
-      icon: <Database className="h-5 w-5" />,
-      action: exportFullData,
-      badge: 'Backup'
-    }
-  ];
 
   return (
-    <div className="space-y-6">
-      {/* Informações sobre Exportação */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Info className="h-5 w-5" />
-            Sobre a Exportação de Dados
+    <div className="space-y-8">
+      {/* Sobre a Exportação de Dados */}
+      <Card className="bg-white/90">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Info className="w-5 h-5 text-blue-500" /> Sobre a Exportação de Dados
           </CardTitle>
           <CardDescription>
             Exporte os seus dados financeiros para backup ou uso noutras aplicações
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4">
-            <h4 className="font-medium text-blue-900 dark:text-blue-100 mb-2">
-              📋 Formatos Disponíveis
-            </h4>
-            <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-              <li>• <strong>CSV:</strong> Ideal para Excel e Google Sheets</li>
-              <li>• <strong>JSON:</strong> Formato estruturado para desenvolvimento</li>
-              <li>• <strong>Backup:</strong> Arquivo completo para restauro</li>
+          <div className="bg-blue-50 rounded-lg p-4 text-sm text-blue-900 flex flex-col gap-1">
+            <div className="font-medium mb-1">📄 Formatos Disponíveis</div>
+            <ul className="list-disc ml-6">
+              <li><b>CSV:</b> Ideal para Excel e Google Sheets</li>
+              <li><b>JSON:</b> Formato estruturado para desenvolvimento</li>
+              <li><b>Backup:</b> Arquivo completo para restauro</li>
             </ul>
           </div>
         </CardContent>
       </Card>
 
-      {/* Opções de Exportação */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Download className="h-5 w-5" />
-            Exportar Dados
+      {/* Exportar Dados */}
+      <Card className="bg-white/90">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Download className="w-5 h-5 text-green-600" /> Exportar Dados
           </CardTitle>
-          <CardDescription>
-            Escolha o tipo de dados e formato que deseja exportar
-          </CardDescription>
+          <CardDescription>Escolha o tipo de dados e formato que deseja exportar</CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {exportOptions.map((option) => (
-              <div key={option.id} className="flex items-center justify-between p-4 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-                    {option.icon}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h4 className="font-medium">{option.title}</h4>
-                      {option.badge && (
-                        <Badge variant="secondary" className="text-xs">
-                          {option.badge}
-                        </Badge>
-                      )}
-                    </div>
-                    <p className="text-sm text-muted-foreground">
-                      {option.description}
-                    </p>
-                  </div>
-                </div>
-                <Button
-                  onClick={option.action}
-                  disabled={loading === option.id}
-                  variant="outline"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  {loading === option.id ? 'A exportar...' : 'Exportar'}
-                </Button>
+        <CardContent className="space-y-4">
+          {/* Transações */}
+          <div className="flex items-center justify-between bg-green-50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <FileText className="w-7 h-7 text-green-700" />
+              <div>
+                <div className="font-semibold">Transações (CSV) <Badge variant="secondary" className="ml-2">Recomendado</Badge></div>
+                <div className="text-sm text-muted-foreground">Exportar todas as transações em formato CSV para Excel</div>
               </div>
-            ))}
+            </div>
+            <Button onClick={handleExportTransactions} disabled={loading==='transactions'}>
+              <Download className="w-4 h-4" /> {loading==='transactions' ? 'A exportar...' : 'Exportar'}
+            </Button>
           </div>
+          {/* Metas */}
+          <div className="flex items-center justify-between bg-blue-50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Target className="w-7 h-7 text-blue-700" />
+              <div>
+                <div className="font-semibold">Metas (JSON)</div>
+                <div className="text-sm text-muted-foreground">Exportar metas de poupança em formato JSON</div>
+              </div>
+            </div>
+            <Button onClick={handleExportGoals} disabled={loading==='goals'}>
+              <Download className="w-4 h-4" /> {loading==='goals' ? 'A exportar...' : 'Exportar'}
+            </Button>
+          </div>
+          {/* Backup Completo */}
+          <div className="flex items-center justify-between bg-purple-50 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <Database className="w-7 h-7 text-purple-700" />
+              <div>
+                <div className="font-semibold">Backup Completo (JSON) <Badge variant="secondary" className="ml-2">Backup</Badge></div>
+                <div className="text-sm text-muted-foreground">Exportar todos os dados incluindo perfil e estatísticas</div>
+              </div>
+            </div>
+            <Button onClick={handleExportBackup} disabled={loading==='backup'}>
+              <Download className="w-4 h-4" /> {loading==='backup' ? 'A exportar...' : 'Exportar'}
+            </Button>
+          </div>
+          {error && <div className="text-red-600 text-sm mt-2">{error}</div>}
         </CardContent>
       </Card>
 
-      {/* Informações de Privacidade */}
-      <Card className="border-green-200 dark:border-green-800">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-300">
-            <Shield className="h-5 w-5" />
-            Privacidade e Segurança
+      {/* Privacidade e Segurança */}
+      <Card className="bg-green-50/60">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base text-green-800">
+            <ShieldCheck className="w-5 h-5" /> Privacidade e Segurança
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-start space-x-2">
-              <span className="text-green-600 dark:text-green-400">✓</span>
-              <p>Os dados são exportados diretamente do seu navegador</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-green-600 dark:text-green-400">✓</span>
-              <p>Nenhuma informação é enviada para servidores externos</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-green-600 dark:text-green-400">✓</span>
-              <p>Os ficheiros exportados ficam apenas no seu dispositivo</p>
-            </div>
-            <div className="flex items-start space-x-2">
-              <span className="text-green-600 dark:text-green-400">✓</span>
-              <p>Dados sensíveis como palavras-passe não são incluídos</p>
-            </div>
-          </div>
-
-          <Separator className="my-4" />
-
-          <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3">
-            <h4 className="font-medium text-amber-900 dark:text-amber-100 mb-1 text-sm">
-              ⚠️ Importante
-            </h4>
-            <p className="text-xs text-amber-700 dark:text-amber-300">
-              Guarde os ficheiros exportados num local seguro. Estes contêm informações financeiras sensíveis 
-              e devem ser protegidos adequadamente.
-            </p>
+          <ul className="list-disc ml-6 text-green-900 text-sm space-y-1">
+            <li>Os dados são exportados diretamente do seu navegador</li>
+            <li>Nenhuma informação é enviada para servidores externos</li>
+            <li>Os ficheiros exportados ficam apenas no seu dispositivo</li>
+            <li>Dados sensíveis como palavras-passe não são incluídos</li>
+          </ul>
+          <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 mt-4 rounded text-yellow-900 text-sm flex items-center gap-2">
+            <span className="font-semibold">⚠️ Importante</span>
+            <span>Guarde os ficheiros exportados num local seguro. Estes contêm informações financeiras sensíveis e devem ser protegidos adequadamente.</span>
           </div>
         </CardContent>
       </Card>

@@ -10,13 +10,7 @@ const __dirname = dirname(__filename);
 // Carregar variáveis de ambiente apenas fora de CI
 const envLocal = path.join(__dirname, '../.env.local');
 const envTest = path.join(__dirname, '../.env.test');
-if (!process.env.CI) {
-  if (fs.existsSync(envLocal)) {
-    dotenv.config({ path: envLocal });
-  } else if (fs.existsSync(envTest)) {
-    dotenv.config({ path: envTest });
-  }
-}
+dotenv.config({ path: envTest });
 
 const MIGRATIONS_DIR = path.join(__dirname, '../migrations');
 const SUPABASE_URL = process.env.SUPABASE_URL;

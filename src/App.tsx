@@ -1,6 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { AuthForm } from '@/components/auth/AuthForm';
+import { AuthForm } from '@/features/auth/components/AuthForm';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useOnboarding } from '@/hooks/useOnboarding';
 import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
@@ -10,7 +10,7 @@ import Index from '@/pages/Index';
 import Goals from '@/pages/Goals';
 import Family from '@/pages/Family';
 import NotFound from '@/pages/NotFound';
-import { SettingsManager } from '@/components/settings/SettingsManager';
+import { SettingsManager } from '@/features/settings/components/SettingsManager';
 import './App.css';
 import React from 'react';
 

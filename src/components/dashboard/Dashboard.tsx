@@ -16,8 +16,8 @@ import {
   CreditCard,
   Filter
 } from 'lucide-react';
-import { TransactionForm } from '@/components/transactions/TransactionForm';
-import { RecentTransactions } from '@/features/transactions/controllers/RecentTransactions';
+import { TransactionForm } from '@/features/transactions/components/TransactionForm';
+import { RecentTransactions } from '@/features/transactions/components/RecentTransactions';
 import { ExpensesPieChart } from '@/components/charts/ExpensesPieChart';
 import { MonthlyTrendChart } from '@/components/charts/MonthlyTrendChart';
 import { SavingsProgressChart } from '@/components/charts/SavingsProgressChart';

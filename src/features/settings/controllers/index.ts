@@ -1,1 +1,0 @@
-// Este ficheiro está obsoleto, pois os componentes foram movidos para features/settings/components/. Pode ser removido ou deixado vazio. 

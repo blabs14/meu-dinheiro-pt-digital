@@ -38,6 +38,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return () => subscription.unsubscribe();
   }, []);
 
+  useEffect(() => {
+    console.log('[useAuth] user mudou:', user);
+  }, [user]);
+
   const signUp = async (email: string, password: string, nome: string) => {
     try {
       const redirectUrl = `${window.location.origin}/`;
