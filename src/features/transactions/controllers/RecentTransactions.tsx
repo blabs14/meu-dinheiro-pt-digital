@@ -130,7 +130,10 @@ export const RecentTransactions = ({ familyId, accountId, selectedMonth }: Recen
                           />
                         )}
                         <p className="font-medium text-sm">
-                          {transaction.descricao || transaction.categories?.nome || 'Sem categoria'}
+                          {(
+                            (transaction.categories?.nome || 'Sem categoria') +
+                            (transaction.descricao ? ` - ${transaction.descricao}` : '')
+                          )}
                         </p>
                       </div>
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
