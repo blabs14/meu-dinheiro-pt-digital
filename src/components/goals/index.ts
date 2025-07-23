@@ -1,3 +1,1 @@
-export { GoalForm } from './GoalForm';
-export { GoalCard } from './GoalCard';
-export { GoalsManager } from './GoalsManager'; 
+// Este ficheiro está obsoleto, pois os componentes foram movidos para features/goals/components/. Pode ser removido ou deixado vazio. 

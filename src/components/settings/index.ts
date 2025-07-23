@@ -1,4 +1,1 @@
-export { ProfileSettings } from './ProfileSettings';
-export { NotificationSettings } from './NotificationSettings';
-export { DataExport } from './DataExport';
-export { SettingsManager } from './SettingsManager'; 
+// Este ficheiro está obsoleto, pois os componentes foram movidos para features/settings/components/. Pode ser removido ou deixado vazio. 
