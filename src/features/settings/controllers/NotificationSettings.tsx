@@ -9,70 +9,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import { Bell, Moon, Sun, Monitor, Palette, Globe, Save } from 'lucide-react';
-
-interface NotificationSettings {
-  email_notifications: boolean;
-  goal_reminders: boolean;
-  monthly_reports: boolean;
-  bill_reminders: boolean;
-  achievement_alerts: boolean;
-}
-
-interface AppPreferences {
-  theme: 'light' | 'dark' | 'system';
-  language: 'pt' | 'en';
-  currency: 'EUR' | 'USD' | 'GBP';
-  date_format: 'dd/mm/yyyy' | 'mm/dd/yyyy' | 'yyyy-mm-dd';
-}
+import { settingsService, NotificationSettings as NotificationSettingsType, AppPreferences } from '../services/settingsService';
 
 export const NotificationSettings = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
 
-  const [notifications, setNotifications] = useState<NotificationSettings>({
-    email_notifications: true,
-    goal_reminders: true,
-    monthly_reports: false,
-    bill_reminders: true,
-    achievement_alerts: true
-  });
-
-  const [preferences, setPreferences] = useState<AppPreferences>({
-    theme: 'system',
-    language: 'pt',
-    currency: 'EUR',
-    date_format: 'dd/mm/yyyy'
-  });
+  const [notifications, setNotifications] = useState<NotificationSettingsType>(settingsService.loadNotificationSettings(user?.id ?? ''));
+  const [preferences, setPreferences] = useState<AppPreferences>(settingsService.loadAppPreferences(user?.id ?? ''));
 
   useEffect(() => {
     if (user) {
-      loadSettings();
+      setNotifications(settingsService.loadNotificationSettings(user.id));
+      setPreferences(settingsService.loadAppPreferences(user.id));
+      applyTheme(settingsService.loadAppPreferences(user.id).theme);
     }
   }, [user]);
-
-  const loadSettings = async () => {
-    if (!user) return;
-
-    try {
-      // Por agora, usar localStorage para as configurações
-      // Em produção, seria melhor ter uma tabela na DB
-      const savedNotifications = localStorage.getItem(`notifications_${user.id}`);
-      const savedPreferences = localStorage.getItem(`preferences_${user.id}`);
-
-      if (savedNotifications) {
-        setNotifications(JSON.parse(savedNotifications));
-      }
-
-      if (savedPreferences) {
-        setPreferences(JSON.parse(savedPreferences));
-        applyTheme(JSON.parse(savedPreferences).theme);
-      }
-
-    } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
-    }
-  };
 
   const applyTheme = (theme: string) => {
     const root = window.document.documentElement;
@@ -90,9 +43,8 @@ export const NotificationSettings = () => {
 
     setLoading(true);
     try {
-      // Guardar no localStorage
-      localStorage.setItem(`notifications_${user.id}`, JSON.stringify(notifications));
-      localStorage.setItem(`preferences_${user.id}`, JSON.stringify(preferences));
+      settingsService.saveNotificationSettings(user.id, notifications);
+      settingsService.saveAppPreferences(user.id, preferences);
 
       // Aplicar tema
       applyTheme(preferences.theme);
@@ -113,7 +65,7 @@ export const NotificationSettings = () => {
     }
   };
 
-  const toggleNotification = (key: keyof NotificationSettings) => {
+  const toggleNotification = (key: keyof NotificationSettingsType) => {
     setNotifications(prev => ({
       ...prev,
       [key]: !prev[key]

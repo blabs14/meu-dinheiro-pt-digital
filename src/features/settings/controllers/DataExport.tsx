@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { settingsService } from '../services/settingsService';
 
 export const DataExport = () => {
   const { user } = useAuth();
@@ -46,30 +47,9 @@ export const DataExport = () => {
 
   const exportTransactionsCSV = async () => {
     if (!user) return;
-    
     setLoading('transactions-csv');
     try {
-      const { data: transactions, error } = await supabase
-        .from('transactions')
-        .select(`
-          id,
-          valor,
-          data,
-          tipo,
-          descricao,
-          user_id,
-          family_id,
-          created_at,
-          categories:categoria_id (
-            nome,
-            cor
-          )
-        `)
-        .eq('user_id', user!.id)
-        .order('data', { ascending: false });
-
-      if (error) throw error;
-
+      const transactions = await settingsService.exportTransactionsCSV(user.id);
       // Cabeçalhos CSV
       const headers = [
         'Data',
@@ -79,18 +59,15 @@ export const DataExport = () => {
         'Descrição',
         'Criado em'
       ];
-
-      // Converter dados para CSV
       const csvData = transactions.map(t => ({
-          id: t.id,
-          valor: t.valor,
-          data: t.data,
-          tipo: t.tipo,
-          descricao: t.descricao || '',
-          categoria: t.categories?.nome || 'Sem categoria',
-          criado_em: t.created_at
-        }));
-
+        id: t.id,
+        valor: t.valor,
+        data: t.data,
+        tipo: t.tipo,
+        descricao: t.descricao || '',
+        categoria: t.categories?.nome || 'Sem categoria',
+        criado_em: t.created_at
+      }));
       const csvContent = [
         headers.join(','),
         ...csvData.map(t => [
@@ -102,15 +79,12 @@ export const DataExport = () => {
           format(new Date(t.criado_em), 'dd/MM/yyyy HH:mm', { locale: pt })
         ].join(','))
       ].join('\n');
-
       const filename = `transacoes_${format(new Date(), 'yyyy-MM-dd')}.csv`;
       downloadFile(csvContent, filename, 'text/csv;charset=utf-8');
-
       toast({
         title: "Sucesso",
         description: `${transactions.length} transações exportadas para ${filename}`,
       });
-
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -124,17 +98,9 @@ export const DataExport = () => {
 
   const exportGoalsJSON = async () => {
     if (!user) return;
-    
     setLoading('goals-json');
     try {
-      const { data: goals, error } = await supabase
-        .from('goals')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
+      const goals = await settingsService.exportGoalsJSON(user.id);
       const exportData = {
         exported_at: new Date().toISOString(),
         user_id: user.id,
@@ -148,15 +114,12 @@ export const DataExport = () => {
           updated_at: goal.updated_at
         }))
       };
-
       const filename = `metas_${format(new Date(), 'yyyy-MM-dd')}.json`;
       downloadFile(JSON.stringify(exportData, null, 2), filename, 'application/json');
-
       toast({
         title: "Sucesso",
         description: `${goals.length} metas exportadas para ${filename}`,
       });
-
     } catch (error: any) {
       toast({
         title: "Erro",
@@ -170,58 +133,15 @@ export const DataExport = () => {
 
   const exportFullData = async () => {
     if (!user) return;
-    
     setLoading('full-data');
     try {
-      // Buscar todos os dados do utilizador
-      const [
-        { data: profile },
-        { data: transactions },
-        { data: goals },
-        { data: fixedExpenses }
-      ] = await Promise.all([
-        supabase.from('profiles').select('*').eq('user_id', user.id).single(),
-        supabase.from('transactions').select(`
-          valor, data, tipo, descricao, created_at,
-          categories:categoria_id (nome, cor)
-        `).eq('user_id', user.id).order('data', { ascending: false }),
-        supabase.from('goals').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-        supabase.from('fixed_expenses').select(`
-          nome, valor, dia_vencimento, ativa, created_at,
-          categories:categoria_id (nome, cor)
-        `).eq('user_id', user.id).order('created_at', { ascending: false })
-      ]);
-
-      const fullExport = {
-        exported_at: new Date().toISOString(),
-        user: {
-          id: user.id,
-          email: user.email,
-          created_at: user.created_at
-        },
-        profile: profile || null,
-        statistics: {
-          total_transactions: transactions?.length || 0,
-          total_goals: goals?.length || 0,
-          total_fixed_expenses: fixedExpenses?.length || 0,
-          total_income: transactions?.filter(t => t.tipo === 'receita').reduce((sum, t) => sum + t.valor, 0) || 0,
-          total_expenses: transactions?.filter(t => t.tipo === 'despesa').reduce((sum, t) => sum + t.valor, 0) || 0
-        },
-        data: {
-          transactions: transactions || [],
-          goals: goals || [],
-          fixed_expenses: fixedExpenses || []
-        }
-      };
-
+      const fullExport = await settingsService.exportFullData(user.id, user.email, user.created_at);
       const filename = `meu_dinheiro_backup_${format(new Date(), 'yyyy-MM-dd_HH-mm')}.json`;
       downloadFile(JSON.stringify(fullExport, null, 2), filename, 'application/json');
-
       toast({
         title: "Sucesso",
         description: `Backup completo exportado para ${filename}`,
       });
-
     } catch (error: any) {
       toast({
         title: "Erro",
