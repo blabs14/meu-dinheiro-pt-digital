@@ -3,9 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/features/auth/components/AuthForm';
 import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { PWAInstallButton } from '@/components/pwa/PWAInstallButton';
-import { NotificationSystem } from '@/components/notifications/NotificationSystem';
-import { Layout } from '@/components/layout/Layout';
+import { MainLayout } from '@/components/layout/MainLayout';
 import Index from '@/pages/Index';
 import Goals from '@/pages/Goals';
 import Family from '@/pages/Family';
@@ -98,7 +96,7 @@ function AppContent() {
   return (
     <Router>
       <div className="min-h-screen bg-background">
-        <Layout>
+        <MainLayout>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/goals" element={<Goals />} />
@@ -106,7 +104,7 @@ function AppContent() {
             <Route path="/settings" element={<SettingsManager />} />
             <Route path="*" element={<NotFound />} />
           </Routes>
-        </Layout>
+        </MainLayout>
       </div>
     </Router>
   );

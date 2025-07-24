@@ -302,23 +302,23 @@ export const Dashboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* Filtro de Mês */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold mb-4">Dashboard Pessoal</h1>
-        <div className="flex items-center gap-4 mb-4">
+        <h1 className="text-xl lg:text-2xl font-bold">Dashboard Pessoal</h1>
+        <div className="flex flex-col lg:flex-row items-end lg:items-center gap-2 lg:gap-4">
           <label className="text-sm font-medium text-muted-foreground">Conta:</label>
           <select
             value={selectedAccountId}
             onChange={e => setSelectedAccountId(e.target.value)}
-            className="w-[200px] p-2 border rounded-md bg-background"
+            className="w-full lg:w-[200px] p-2 border rounded-md bg-background text-sm"
           >
             <option value="all">Todas as Contas</option>
             {accounts && accounts.length > 0 && accounts.map(acc => (
               <option key={acc.id} value={acc.id}>{acc.nome}</option>
             ))}
           </select>
-          <Button variant="outline" size="sm" onClick={() => setShowAddAccount(true)}>
+          <Button variant="outline" size="sm" onClick={() => setShowAddAccount(true)} className="w-full lg:w-auto">
             <Plus className="h-4 w-4 mr-1" /> Adicionar Conta
           </Button>
         </div>
@@ -338,7 +338,7 @@ export const Dashboard = () => {
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-            <SelectTrigger className="w-[200px]">
+            <SelectTrigger className="w-full lg:w-[200px]">
               <SelectValue placeholder="Selecionar período" />
             </SelectTrigger>
             <SelectContent>
@@ -353,7 +353,7 @@ export const Dashboard = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Rendimento Total</CardTitle>
@@ -397,7 +397,7 @@ export const Dashboard = () => {
       </div>
 
       {accountStats && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mt-2">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mt-2">
           <Card className="py-2 h-24">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1">
               <CardTitle className="text-xs font-medium">Rendimento da Conta</CardTitle>
@@ -477,7 +477,7 @@ export const Dashboard = () => {
       </Card>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
         <ExpensesPieChart familyId={null} accountId={selectedAccountId} />
         <SavingsProgressChart familyId={null} accountId={selectedAccountId} />
       </div>
@@ -489,38 +489,38 @@ export const Dashboard = () => {
       <RecentTransactions familyId={null} accountId={selectedAccountId} selectedMonth={selectedMonth} />
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
         <Button 
-          className="h-24 flex flex-col gap-2" 
+          className="h-16 lg:h-24 flex flex-col gap-1 lg:gap-2" 
           variant="outline"
           onClick={() => {
             setTransactionType('despesa');
             setShowTransactionForm(true);
           }}
         >
-          <Plus className="h-6 w-6" />
-          <span>Nova Despesa</span>
+          <Plus className="h-5 w-5 lg:h-6 lg:w-6" />
+          <span className="text-sm lg:text-base">Nova Despesa</span>
         </Button>
         
         <Button 
-          className="h-24 flex flex-col gap-2" 
+          className="h-16 lg:h-24 flex flex-col gap-1 lg:gap-2" 
           variant="outline"
           onClick={() => {
             setTransactionType('receita');
             setShowTransactionForm(true);
           }}
         >
-          <TrendingUp className="h-6 w-6" />
-          <span>Nova Receita</span>
+          <TrendingUp className="h-5 w-5 lg:h-6 lg:w-6" />
+          <span className="text-sm lg:text-base">Nova Receita</span>
         </Button>
         
         <Button 
-          className="h-24 flex flex-col gap-2" 
+          className="h-16 lg:h-24 flex flex-col gap-1 lg:gap-2 sm:col-span-2 lg:col-span-1" 
           variant="outline"
           onClick={() => navigate('/goals')}
         >
-          <Target className="h-6 w-6" />
-          <span>Metas</span>
+          <Target className="h-5 w-5 lg:h-6 lg:w-6" />
+          <span className="text-sm lg:text-base">Metas</span>
         </Button>
       </div>
 

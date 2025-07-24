@@ -6,14 +6,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export function SettingsManager() {
   return (
-    <div className="container mx-auto p-6">
+    <div className="container mx-auto p-4 lg:p-6">
       <div className="mb-8">
         <h2 className="text-3xl font-bold text-gray-900 mb-2">⚙️ Configurações</h2>
         <p className="text-gray-600">Gerir a sua conta, preferências e dados</p>
       </div>
 
       <Tabs defaultValue="profile" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 lg:grid-cols-4">
           <TabsTrigger value="profile">Perfil</TabsTrigger>
           <TabsTrigger value="family">Família</TabsTrigger>
           <TabsTrigger value="notifications">Notificações</TabsTrigger>

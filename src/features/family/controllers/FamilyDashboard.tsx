@@ -489,7 +489,7 @@ export const FamilyDashboard = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-4 lg:space-y-6">
       {/* Convites Pendentes */}
       {pendingInvites.length > 0 && (
         <Card className="border-yellow-400">
@@ -532,7 +532,7 @@ export const FamilyDashboard = () => {
                   <label className="text-sm font-medium text-muted-foreground mb-2 block">
                     Selecionar Família:
                   </label>
-                  <div className="flex gap-2 items-center">
+                  <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center">
                     <select
                       value={selectedFamilyId}
                       onChange={(e) => {
@@ -543,7 +543,7 @@ export const FamilyDashboard = () => {
                           setCurrentFamily(selectedFamily);
                         }
                       }}
-                      className="flex-1 max-w-xs p-2 border rounded-md bg-background"
+                      className="w-full sm:flex-1 sm:max-w-xs p-2 border rounded-md bg-background text-sm"
                     >
                       {userFamilies.map((family) => (
                         <option key={family.id} value={family.id}>
@@ -556,7 +556,7 @@ export const FamilyDashboard = () => {
                       size="sm"
                       onClick={() => handleLeaveFamily(selectedFamilyId)}
                       disabled={currentFamily?.userRole === 'owner'}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 w-full sm:w-auto"
                     >
                       <LogOut className="h-4 w-4 mr-1" />
                       Sair
@@ -571,16 +571,16 @@ export const FamilyDashboard = () => {
               )}
               
               <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold flex items-center gap-2">
-                  <Users className="h-8 w-8 text-primary" />
+                <h1 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
+                  <Users className="h-6 w-6 lg:h-8 lg:w-8 text-primary" />
                   {currentFamily.nome}
                 </h1>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2">
                   <Filter className="h-4 w-4 text-muted-foreground" />
                   <select
                     value={selectedMonth}
                     onChange={e => setSelectedMonth(e.target.value)}
-                    className="w-[200px] p-2 border rounded-md bg-background"
+                    className="w-full sm:w-[200px] p-2 border rounded-md bg-background text-sm"
                   >
                     {getMonthOptions().map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -588,14 +588,14 @@ export const FamilyDashboard = () => {
                   </select>
                 </div>
               </div>
-              <p className="text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1">
                 Dashboard da família • {familyMembers.length} membros • Você é {getRoleLabel(userRole)}
               </p>
             </div>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Rendimento Familiar</CardTitle>
@@ -654,7 +654,7 @@ export const FamilyDashboard = () => {
           </div>
 
           {/* Gráficos e Transações */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">Gráfico de Despesas</CardTitle>
@@ -694,7 +694,7 @@ export const FamilyDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4">
                 {familyMembers.map((member: any) => (
                   <div key={member.id} className="flex items-center space-x-3 p-3 border rounded-lg">
                     <div className="w-10 h-10 bg-primary text-primary-foreground rounded-full flex items-center justify-center">
@@ -736,12 +736,12 @@ export const FamilyDashboard = () => {
         </>
       ) : (
         <div className="text-center py-12">
-          <Users className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-2">Nenhuma Família Encontrada</h2>
+          <Users className="h-12 w-12 lg:h-16 lg:w-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl lg:text-2xl font-bold mb-2">Nenhuma Família Encontrada</h2>
           <p className="text-muted-foreground mb-6">
             Precisa de criar ou juntar-se a uma família para ver o dashboard.
           </p>
-          <Button onClick={() => navigate('/settings')} className="mr-4">
+          <Button onClick={() => navigate('/settings')} className="w-full sm:w-auto">
             <Settings className="h-4 w-4 mr-2" />
             Ir para Configurações
           </Button>

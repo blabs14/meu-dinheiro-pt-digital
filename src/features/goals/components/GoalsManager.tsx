@@ -95,31 +95,31 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="max-w-6xl mx-auto p-4 space-y-6">
+    <div className="space-y-4 lg:space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Target className="h-8 w-8 text-primary" />
+            <h1 className="text-xl lg:text-3xl font-bold flex items-center gap-2">
+              <Target className="h-6 w-6 lg:h-8 lg:w-8 text-primary" />
               {familyId ? 'Metas da Família' : 'Metas de Poupança'}
             </h1>
-            <p className="text-muted-foreground mt-1">
+            <p className="text-sm lg:text-base text-muted-foreground mt-1">
               {familyId 
                 ? 'Metas partilhadas com a família'
                 : 'Defina e acompanhe os seus objetivos financeiros'
               }
             </p>
           </div>
-          <Button onClick={() => setFormOpen(true)} className="flex items-center gap-2">
+          <Button onClick={() => setFormOpen(true)} className="flex items-center gap-2" size="sm">
             <Plus className="h-4 w-4" />
-            Nova Meta
+            <span className="hidden sm:inline">Nova Meta</span>
+            <span className="sm:hidden">Nova</span>
           </Button>
         </div>
 
         {/* Estatísticas */}
         {totalGoals > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Total de Metas</CardTitle>
@@ -179,7 +179,7 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
 
         {/* Lista de Metas */}
         {goals.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 lg:gap-6">
             {goals.map((goal) => (
               <GoalCard
                 key={goal.id}
@@ -216,10 +216,10 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
         {goals.length > 0 && (
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">💡 Dicas para Atingir as Suas Metas</CardTitle>
+              <CardTitle className="text-base lg:text-lg">💡 Dicas para Atingir as Suas Metas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-muted-foreground">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 text-sm text-muted-foreground">
                 <div>
                   <h4 className="font-medium text-foreground mb-2">🎯 Seja Específico</h4>
                   <p>Defina metas claras com valores e prazos específicos. "€5000 para férias até Julho" é melhor que "poupar para férias".</p>
@@ -240,7 +240,6 @@ export const GoalsManager = ({ refreshTrigger, familyId }: GoalsManagerProps) =>
             </CardContent>
           </Card>
         )}
-      </div>
 
       {/* Formulário de Meta */}
       <GoalForm
